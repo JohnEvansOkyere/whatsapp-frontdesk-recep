@@ -43,7 +43,7 @@ Document every change and addition. Update this file whenever code or structure 
   - `handlers/faq.py` — `reply_faq`.
   - `handlers/support.py` — `initiate_handoff` (sends to group + customer).
   - `bot.py` — Entry for `python -m app.bot.bot`; main() placeholder.
-  - `telegram_entry.py` — `handle_telegram_update` orchestration stub (get/create customer, build prompt, call message_handler; all TODOs).
+  - `telegram_entry.py` — `handle_telegram_update` orchestration: parses basic text messages, builds minimal system prompt, calls `handle_incoming_message`, and replies via `TelegramChannel` (business/customer mapping still TODO).
 
 - **app/services/**
   - `booking_service.py` — `get_available_slots`, `create_booking`, `cancel_booking` (stubs).

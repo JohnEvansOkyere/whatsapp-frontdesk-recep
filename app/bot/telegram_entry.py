@@ -26,38 +26,47 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
     - Call ai_service.process_message via handle_incoming_message
     - Dispatch actions (SHOW_SLOTS, SHOW_BOOKINGS, etc.) via booking/appointments/support handlers
 
-    This function intentionally leaves DB details and mappings as TODOs.
+    This function intentionally leaves DB details and mappings as TODOs, but
+    provides a minimal working loop for development.
     """
 
-    # TODO: extract chat_id / user_id and message text safely from update
-    # Example (not assuming exact schema):
-    # chat_id = ...
-    # text = ...
+    # Extract chat_id and text from a basic message update.
+    # More update types (callbacks, edited messages) can be added later.
+    message = update.get("message") or update.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    chat_id = chat.get("id")
+    text = message.get("text") or ""
+
+    if chat_id is None or not text:
+        # Nothing to do (e.g. non-text message); ignore for now.
+        return
 
     # TODO: resolve business_id: UUID = ...
     # TODO: get/create customer_id: UUID = ...
-    # TODO: build system_prompt string from business + FAQ + booking context
+    # TODO: build full system_prompt string from business + FAQ + booking context
     # TODO: load last 20 messages from conversation_history and build `messages` list
+
+    # Minimal prompt for early development; replace with full CLAUDE prompt later.
+    system_prompt = "You are a helpful front desk assistant. Answer briefly."
+    messages: list[dict[str, str]] = [{"role": "user", "content": text}]
 
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     channel = TelegramChannel(bot=bot)
 
-    # Placeholder values so the call shape is clear; real implementation must
-    # replace these with actual IDs and message history.
+    # Placeholder IDs until proper multi-tenant mapping and customer lookup are implemented.
     dummy_business_id = UUID(int=0)
     dummy_customer_id = UUID(int=0)
-    dummy_recipient_id = "0"
-    dummy_text = ""
-    system_prompt = ""
-    messages: list[dict[str, str]] = []
 
-    await handle_incoming_message(
+    result = await handle_incoming_message(
         channel=channel,
-        recipient_id=dummy_recipient_id,
+        recipient_id=str(chat_id),
         business_id=dummy_business_id,
         customer_id=dummy_customer_id,
-        text=dummy_text,
+        text=text,
         system_prompt=system_prompt,
         messages=messages,
     )
+
+    if result and result.reply_text:
+        await channel.send_message(str(chat_id), result.reply_text)
 
