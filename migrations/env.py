@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.exc import ArgumentError as SQLAlchemyArgumentError
 
 from alembic import context
 
@@ -19,9 +20,19 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    """Return DB URL for Alembic."""
-    # Prefer NEON_DATABASE_URL; fall back to local sync sqlite for dev/autogenerate.
-    return settings.NEON_DATABASE_URL or "sqlite:///./alembic.db"
+    """Return PostgreSQL DB URL for Alembic (Neon)."""
+    url = (settings.NEON_DATABASE_URL or "").strip().strip('"').strip("'")
+    if not url:
+        raise RuntimeError(
+            "NEON_DATABASE_URL is required. Set it in .env with your Neon PostgreSQL connection string "
+            "(e.g. postgresql://user:password@host/dbname?sslmode=require)."
+        )
+    if not (url.startswith("postgresql://") or url.startswith("postgres://")):
+        raise RuntimeError(
+            "NEON_DATABASE_URL must be a PostgreSQL URL starting with postgresql:// or postgres://. "
+            f"Got: {url[:50]}..."
+        )
+    return url
 
 
 def run_migrations_offline() -> None:
@@ -41,11 +52,18 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
-        {"sqlalchemy.url": get_url()},
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    try:
+        connectable = engine_from_config(
+            {"sqlalchemy.url": get_url()},
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+    except SQLAlchemyArgumentError as e:
+        raise RuntimeError(
+            "NEON_DATABASE_URL is set but could not be parsed as a database URL. "
+            "Use a valid PostgreSQL URL (e.g. postgresql://user:password@host/dbname?sslmode=require). "
+            "Check .env for extra spaces, quotes, or newlines."
+        ) from e
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)

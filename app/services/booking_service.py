@@ -190,3 +190,102 @@ async def cancel_booking(session: AsyncSession, booking_id: UUID) -> bool:
     b.status = BookingStatusEnum.cancelled
     await session.flush()
     return True
+
+
+async def get_bookings_for_customer(
+    session: AsyncSession,
+    customer_id: UUID,
+    business_id: UUID,
+    *,
+    upcoming_only: bool = True,
+) -> list[dict]:
+    """List bookings for a customer at a business. Default: upcoming confirmed only."""
+    from datetime import date
+
+    q = (
+        select(Booking)
+        .where(
+            Booking.customer_id == customer_id,
+            Booking.business_id == business_id,
+            Booking.status == BookingStatusEnum.confirmed,
+        )
+        .options(selectinload(Booking.service))
+        .order_by(Booking.booking_date, Booking.booking_time)
+    )
+    result = await session.execute(q)
+    bookings = result.scalars().all()
+    if upcoming_only:
+        today = date.today()
+        bookings = [b for b in bookings if b.booking_date >= today]
+    return [
+        {
+            "id": str(b.id),
+            "booking_reference": b.booking_reference,
+            "booking_date": b.booking_date.isoformat(),
+            "booking_time": b.booking_time.isoformat() if hasattr(b.booking_time, "isoformat") else str(b.booking_time),
+            "service_name": b.service.name if b.service else "—",
+        }
+        for b in bookings
+    ]
+
+
+async def get_booking(session: AsyncSession, booking_id: UUID) -> dict | None:
+    """Load one booking by id with service; return dict or None."""
+    result = await session.execute(
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .options(selectinload(Booking.service))
+        .limit(1)
+    )
+    b = result.scalars().first()
+    if not b:
+        return None
+    return {
+        "id": str(b.id),
+        "booking_reference": b.booking_reference,
+        "booking_date": b.booking_date.isoformat(),
+        "booking_time": b.booking_time.isoformat() if hasattr(b.booking_time, "isoformat") else str(b.booking_time),
+        "service_name": b.service.name if b.service else "—",
+        "status": b.status.value,
+    }
+
+
+async def reschedule_booking(
+    session: AsyncSession,
+    booking_id: UUID,
+    new_date: date,
+    new_time: time_type,
+) -> dict | None:
+    """Update booking date/time, cancel old reminders, schedule new ones. Return booking dict or None."""
+    from app.services.reminder_service import cancel_reminders, schedule_reminders
+
+    result = await session.execute(
+        select(Booking)
+        .where(Booking.id == booking_id, Booking.status == BookingStatusEnum.confirmed)
+        .options(
+            selectinload(Booking.service),
+            selectinload(Booking.customer),
+            selectinload(Booking.business),
+        )
+        .limit(1)
+    )
+    b = result.scalars().first()
+    if not b or not b.business or not b.customer:
+        return None
+    cancel_reminders(b.reminder_24h_job_id, b.reminder_1h_job_id)
+    b.booking_date = new_date
+    b.booking_time = new_time
+    await session.flush()
+
+    time_str = new_time.isoformat() if hasattr(new_time, "isoformat") else str(new_time)
+    rid_24h, rid_1h = schedule_reminders(
+        b.id,
+        new_date.isoformat(),
+        time_str,
+        b.business.name,
+        b.customer.telegram_id or "",
+        b.booking_reference,
+        str(b.party_size or ""),
+    )
+    await update_booking_reminder_jobs(session, b.id, rid_24h, rid_1h)
+    return await get_booking(session, booking_id)

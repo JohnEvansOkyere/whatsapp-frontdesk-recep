@@ -118,6 +118,36 @@ async def handle_telegram_callback(
         customer.conversation_state = state
         return
 
+    if data.startswith("manage_cancel_"):
+        try:
+            bid = UUID(data.replace("manage_cancel_", "").strip())
+        except (ValueError, AttributeError):
+            await channel.send_message(recipient_id, "Invalid booking.")
+            return
+        from app.services.booking_service import cancel_booking
+        cancelled = await cancel_booking(session, bid)
+        if cancelled:
+            await channel.send_message(recipient_id, "Your booking has been cancelled.")
+        else:
+            await channel.send_message(recipient_id, "Booking not found or could not be cancelled.")
+        return
+
+    if data.startswith("manage_reschedule_"):
+        await channel.send_message(
+            recipient_id,
+            "Reply with the date you'd like (e.g. tomorrow or a specific date) and we'll show available times.",
+        )
+        return
+
+    if data.startswith("manage_booking_"):
+        try:
+            bid = UUID(data.replace("manage_booking_", "").strip())
+        except (ValueError, AttributeError):
+            await channel.send_message(recipient_id, "Invalid booking.")
+            return
+        await appointments.show_manage_options(channel, recipient_id, bid, session=session)
+        return
+
     # Assume data is a slot time (e.g. "19:00:00" or "19:00")
     if not pending.get("service_id") or not pending.get("booking_date"):
         await channel.send_message(recipient_id, "Please pick a time from the list above.")
@@ -266,11 +296,11 @@ async def handle_telegram_update(
             )
         elif result.action == AIAction.SHOW_BOOKINGS:
             await appointments.show_bookings(
-                channel, recipient_id, customer_id, business_id
+                channel, recipient_id, customer_id, business_id, session=session
             )
         elif result.action == AIAction.MANAGE_BOOKING:
             await appointments.show_manage_options(
-                channel, recipient_id, _uuid_from_data(data, "booking_id")
+                channel, recipient_id, _uuid_from_data(data, "booking_id"), session=session
             )
         elif result.action == AIAction.HUMAN_HANDOFF:
             await support.initiate_handoff(

@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Front Desk Bot API", lifespan=lifespan)
+# Interactive API docs (no extra config): GET /docs (Swagger UI), GET /redoc (ReDoc)
 
 app.include_router(webhooks.router)
 app.include_router(appointments.router)

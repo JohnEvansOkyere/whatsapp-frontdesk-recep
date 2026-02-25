@@ -84,13 +84,30 @@ Document every change and addition. Update this file whenever code or structure 
 - **migrations/versions/8f69d917878c_initial_schema.py** — Initial schema for businesses, customers, services, staff, bookings, faqs, conversation_history, support_sessions (including `telegram_bot_token`). Fixed for PostgreSQL: `sa.Text()`/`sa.String()` in JSON/ARRAY, `server_default=sa.text('now()')`.
 - **Neon setup**: Create a project and DB in [Neon](https://neon.tech), copy the connection string into `.env` as `NEON_DATABASE_URL`, then run `alembic upgrade head` to apply migrations.
 
-### Pending (to implement)
+### FAQ upload (this session)
 
-- Implement OpenAI/Gemini HTTP calls in ai_service providers.
-- Wire WhatsApp webhook body → message_handler.
-- Implement calendar_service OAuth and create_event.
-- Tests: test_booking, test_ai_service, test_channels.
-- Procfile, README content.
+- **faq_service** — `add_faq(session, business_id, question, answer, keywords)`, `add_faqs_bulk(session, business_id, items)`, `delete_faq(session, faq_id)`.
+- **FAQ API** — POST/GET `/api/businesses/{id}/faqs` (add one, list), DELETE `/api/faqs/{id}`, POST `/api/businesses/{id}/faqs/import` (bulk: JSON body or file upload).
+- **Import formats** — CSV (columns question, answer, keywords) or TXT with `Q:` / `A:` / optional `K:` blocks. README documents how businesses can upload an FAQ doc.
+
+### Implemented (this session)
+
+- **faq_service.get_faqs_for_business** — Queries FAQs by `business_id`, returns `[{question, answer, keywords}]`.
+- **appointments handler** — `show_bookings(channel, recipient_id, customer_id, business_id, session)` lists upcoming bookings via `get_bookings_for_customer`, sends as list; tapping one triggers `manage_booking_{id}`. `show_manage_options(..., booking_id, session)` shows Reschedule / Cancel buttons; callbacks `manage_cancel_{id}` and `manage_reschedule_{id}` handled in `handle_telegram_callback` (cancel calls `cancel_booking`, reschedule prompts user to reply with new date).
+- **booking_service** — `get_bookings_for_customer(session, customer_id, business_id, upcoming_only=True)`, `get_booking(session, booking_id)`, `reschedule_booking(session, booking_id, new_date, new_time)` (updates booking, cancels old reminders, schedules new ones).
+- **API bookings CRUD** — GET `/api/bookings` with optional `business_id`, `customer_id`; POST create (returns 400 if slot taken); PATCH `/{id}` reschedule (date/time); DELETE `/{id}` cancel.
+
+### Next to improve (prioritized)
+
+**Channels & AI**
+4. **OpenAI / Gemini providers** — Implement HTTP calls in `ai_service` for `openai` and `gemini` so users can switch provider via `AI_PROVIDER`.
+5. **WhatsApp webhook** — Parse Meta webhook payload and call the same message_handler flow (get business, customer, AI, send reply) so production can use WhatsApp.
+
+**Integrations & ops**
+6. **calendar_service** — Google OAuth flow and `create_event` so confirmed bookings sync to a business calendar.
+7. **API auth** — Protect `/api/*` with API key or JWT so CRUD isn’t open.
+8. **Tests** — `test_booking`, `test_ai_service`, `test_channels` (and optionally test_telegram_entry).
+9. **Procfile** — For deployment (e.g. `web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`).
 
 ---
 
