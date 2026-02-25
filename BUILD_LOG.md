@@ -57,14 +57,24 @@ Document every change and addition. Update this file whenever code or structure 
 
 - **app/core/config.py** — Defaults set to AI_PROVIDER=groq, AI_MODEL=llama-3.1-8b-instant.
 
+### Added (this session)
+
+- **app/services/customer_service.py** — `get_or_create_customer_by_telegram(session, telegram_id, full_name)`.
+- **app/services/business_service.py** — `get_first_active_business(session)`, `get_business_by_id(session, business_id)` with services/faqs/staff loaded.
+- **app/services/conversation_service.py** — `get_recent_messages`, `add_message`, `trim_to_limit` (20 per customer/business).
+- **app/services/support_service.py** — `get_active_support_session(session, customer_id, business_id)`.
+- **app/utils/prompt_builder.py** — `build_system_prompt`, `format_services_for_prompt`, `format_staff_for_prompt`, `format_faqs_for_prompt`, `booking_context_from_state`.
+- **app/bot/telegram_entry.py** — Full flow: resolve business (first active) + get/create customer; check active support session (forward to group and return); load last 20 messages; build CLAUDE system prompt; call AI; save user + assistant message and trim; dispatch actions with real business_id/customer_id and business.telegram_group_id/customer.full_name.
+- **app/utils/datetime_utils.py** — `generate_slots_for_day`, `slot_taken`, `parse_date_from_user` implemented.
+- **app/services/booking_service.py** — `get_available_slots` implemented (working_hours, slot generation, filter by existing confirmed bookings).
+- **app/bot/handlers/booking.py** — `show_available_slots` calls `get_available_slots`, sends slot buttons via channel; accepts `session` and passes to service.
+- **app/bot/keyboards.py** — Slot buttons set `action` to time string for callback_data.
+
 ### Pending (to implement)
 
 - Alembic migrations (migrations folder, env.py, first migration).
-- .env.example with all vars from CLAUDE.
 - Implement OpenAI/Gemini HTTP calls in ai_service providers.
-- Wire Telegram webhook body → message_handler (resolve business, customer, build system prompt).
 - Wire WhatsApp webhook body → message_handler.
-- Implement booking_service + datetime_utils slot logic.
 - Implement calendar_service OAuth and create_event.
 - Implement reminder_service schedule_reminders (APScheduler jobs).
 - Tests: test_booking, test_ai_service, test_channels.

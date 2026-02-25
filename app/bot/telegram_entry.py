@@ -1,6 +1,6 @@
 """Telegram entrypoint orchestration.
 
-High-level flow only; concrete DB queries and mappings are left as TODOs.
+Resolves business + customer, loads conversation, builds system prompt, calls AI, saves history, dispatches actions.
 """
 from __future__ import annotations
 
@@ -14,7 +14,23 @@ from app.bot.handlers import appointments, booking, support
 from app.bot.handlers.message_handler import handle_incoming_message
 from app.channels.telegram import TelegramChannel
 from app.core.config import settings
+from app.models.db.conversation import MessageRoleEnum
 from app.services.ai_service import AIAction
+from app.services.business_service import get_first_active_business
+from app.services.conversation_service import (
+    add_message,
+    get_recent_messages,
+    trim_to_limit,
+)
+from app.services.customer_service import get_or_create_customer_by_telegram
+from app.services.support_service import get_active_support_session
+from app.utils.prompt_builder import (
+    booking_context_from_state,
+    build_system_prompt,
+    format_faqs_for_prompt,
+    format_services_for_prompt,
+    format_staff_for_prompt,
+)
 
 
 def _uuid_from_data(data: Dict[str, Any], key: str) -> UUID:
@@ -53,30 +69,52 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
     text = message.get("text") or ""
 
     if chat_id is None or not text:
-        # Nothing to do (e.g. non-text message); ignore for now.
         return
-
-    # TODO: resolve business_id: UUID = ...
-    # TODO: get/create customer_id: UUID = ...
-    # TODO: build full system_prompt string from business + FAQ + booking context
-    # TODO: load last 20 messages from conversation_history and build `messages` list
-
-    # Minimal prompt for early development; replace with full CLAUDE prompt later.
-    system_prompt = "You are a helpful front desk assistant. Answer briefly."
-    messages: list[dict[str, str]] = [{"role": "user", "content": text}]
 
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     channel = TelegramChannel(bot=bot)
+    recipient_id = str(chat_id)
+    telegram_id = str(chat_id)
+    from_user = message.get("from") or {}
+    full_name = from_user.get("first_name") or from_user.get("last_name") or None
 
-    # Placeholder IDs until proper multi-tenant mapping and customer lookup are implemented.
-    dummy_business_id = UUID(int=0)
-    dummy_customer_id = UUID(int=0)
+    business = await get_first_active_business(session)
+    if not business:
+        await channel.send_message(recipient_id, "No business configured yet. Please try again later.")
+        return
+
+    customer = await get_or_create_customer_by_telegram(session, telegram_id, full_name)
+    business_id = business.id
+    customer_id = customer.id
+
+    active_session = await get_active_support_session(session, customer_id, business_id)
+    if active_session and business.telegram_group_id:
+        await channel.forward_to_group(
+            business.telegram_group_id,
+            f"Customer ({customer.full_name or 'Guest'}): {text}",
+        )
+        return
+
+    history = await get_recent_messages(session, customer_id, business_id)
+    messages = history + [{"role": "user", "content": text}]
+
+    system_prompt = build_system_prompt(
+        business_name=business.name,
+        business_type=business.type.value,
+        working_hours=business.working_hours,
+        location=business.location,
+        phone=business.phone,
+        services_text=format_services_for_prompt(business.services),
+        staff_text=format_staff_for_prompt(business.staff),
+        faq_text=format_faqs_for_prompt(business.faqs),
+        booking_context=booking_context_from_state(customer.conversation_state),
+    )
 
     result = await handle_incoming_message(
         channel=channel,
-        recipient_id=str(chat_id),
-        business_id=dummy_business_id,
-        customer_id=dummy_customer_id,
+        recipient_id=recipient_id,
+        business_id=business_id,
+        customer_id=customer_id,
         text=text,
         system_prompt=system_prompt,
         messages=messages,
@@ -84,11 +122,16 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
 
     if result:
         if result.reply_text:
-            await channel.send_message(str(chat_id), result.reply_text)
+            await channel.send_message(recipient_id, result.reply_text)
 
-        # Dispatch on action (CLAUDE Message Handler Flow)
-        recipient_id = str(chat_id)
+        await add_message(session, customer_id, business_id, MessageRoleEnum.user, text)
+        await add_message(session, customer_id, business_id, MessageRoleEnum.assistant, result.reply_text or "")
+        await trim_to_limit(session, customer_id, business_id)
+
         data = result.data or {}
+        group_id = business.telegram_group_id or "0"
+        customer_name = customer.full_name or "Customer"
+
         if result.action == AIAction.SHOW_SLOTS:
             party_size = data.get("party_size")
             if party_size is not None and not isinstance(party_size, int):
@@ -99,30 +142,29 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
             await booking.show_available_slots(
                 channel,
                 recipient_id,
-                dummy_business_id,
+                business_id,
                 _uuid_from_data(data, "service_id"),
                 data.get("date") or "",
                 party_size,
+                session=session,
             )
         elif result.action == AIAction.SHOW_BOOKINGS:
             await appointments.show_bookings(
-                channel, recipient_id, dummy_customer_id, dummy_business_id
+                channel, recipient_id, customer_id, business_id
             )
         elif result.action == AIAction.MANAGE_BOOKING:
             await appointments.show_manage_options(
                 channel, recipient_id, _uuid_from_data(data, "booking_id")
             )
         elif result.action == AIAction.HUMAN_HANDOFF:
-            # TODO: use business.telegram_group_id and customer full_name
             await support.initiate_handoff(
                 channel,
                 recipient_id,
-                group_id="0",
-                customer_id=dummy_customer_id,
-                customer_name="Customer",
+                group_id=group_id,
+                customer_id=customer_id,
+                customer_name=customer_name,
                 last_message=text,
             )
         elif result.action == AIAction.CONFIRM_BOOKING:
-            # TODO: build args from data + DB (service name, price, etc.)
             pass
 

@@ -1,8 +1,11 @@
 """Booking flow: show_available_slots, show_confirmation, on_booking_confirmed. See CLAUDE Booking Flow."""
 from uuid import UUID
 
-from app.bot.keyboards import confirm_booking_buttons
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.bot.keyboards import confirm_booking_buttons, slot_buttons
 from app.channels.base import BaseChannel
+from app.services.booking_service import get_available_slots
 from app.utils.message_templates import confirmation_body
 
 
@@ -13,10 +16,18 @@ async def show_available_slots(
     service_id: UUID,
     booking_date: str,
     party_size: int | None,
+    session: AsyncSession | None = None,
 ) -> None:
     """Get working hours, generate slots, exclude booked, send as buttons (max 8 per page)."""
-    # TODO: load business, generate slots via datetime_utils, query bookings, send_buttons
-    pass
+    if not session:
+        return
+    slots = await get_available_slots(session, business_id, service_id, booking_date)
+    if not slots:
+        await channel.send_message(recipient_id, "No available slots for that date. Try another day?")
+        return
+    buttons = slot_buttons(slots, page=0, per_page=8)
+    text = f"Available slots for {booking_date}:\n\nPick a time:"
+    await channel.send_buttons(recipient_id, text, buttons)
 
 
 async def show_confirmation(
