@@ -107,7 +107,7 @@ Document every change and addition. Update this file whenever code or structure 
 6. **calendar_service** — Google OAuth flow and `create_event` so confirmed bookings sync to a business calendar.
 7. **API auth** — Protect `/api/*` with API key or JWT so CRUD isn’t open.
 8. **Tests** — `test_booking`, `test_ai_service`, `test_channels` (and optionally test_telegram_entry).
-9. **Procfile** — For deployment (e.g. `web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`).
+9. **Procfile** — For deployment (e.g. `web: uvicorn app.main:app --host 0.0.0.0 --port $PORT`). **Done:** Procfile, render.yaml, runtime.txt, README "Deploy on Render" section.
 
 ---
 

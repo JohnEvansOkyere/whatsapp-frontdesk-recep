@@ -128,6 +128,35 @@ Businesses can manage FAQs via the API:
 
 Use the API docs at `/docs` to try these (e.g. upload a `.txt` or `.csv` file for import).
 
+## Deploy on Render
+
+1. **Push the repo** to GitHub (or connect GitLab).
+
+2. **Create a Web Service** on [Render](https://render.com):
+   - **New → Web Service**, connect your repo.
+   - Or use the **Blueprint**: add `render.yaml` from this repo and **Apply**; Render will create the service from it.
+
+3. **Configure the service** (if not using Blueprint):
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Pre-Deploy Command (optional but recommended):** `alembic upgrade head`
+
+4. **Set environment variables** in Render Dashboard → **Environment**:
+   - **`NEON_DATABASE_URL`** (required) — Your Neon PostgreSQL connection string.
+   - **`TELEGRAM_BOT_TOKEN`** — From [@BotFather](https://t.me/BotFather).
+   - **`GROQ_API_KEY`** — If using default AI provider Groq.
+   - **`ENVIRONMENT`** — Set to `production`.
+   - Optional: `TELEGRAM_WEBHOOK_URL` (your Render URL, e.g. `https://your-service.onrender.com`), `SECRET_KEY`, `BASE_URL`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`.
+
+5. **Deploy.** After the first successful deploy, note your service URL (e.g. `https://frontdesk-bot-api.onrender.com`).
+
+6. **Set the Telegram webhook** (replace with your URL and `business_id`):
+   ```bash
+   curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://YOUR-RENDER-URL.onrender.com/webhook/telegram/YOUR_BUSINESS_UUID"
+   ```
+
+**Note:** On the free tier, the service may spin down after inactivity; the first request after idle can be slow. Use a paid plan for always-on or add an uptime ping.
+
 ## Docs
 
 - **[MIGRATIONS.md](MIGRATIONS.md)** — How to run and create migrations, Neon setup.
