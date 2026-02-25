@@ -77,9 +77,15 @@ Document every change and addition. Update this file whenever code or structure 
 - **booking handler on_booking_confirmed** — Calls create_booking, schedule_reminders, update_booking_reminder_jobs, new_booking_notification to group, confirmation message to customer.
 - **telegram_entry handle_telegram_callback** — Handles callback_query: slot time → save time to pending_booking, show_confirmation; confirm_booking → on_booking_confirmed, clear pending; cancel_booking → clear pending. **handle_telegram_update** routes callback_query to handle_telegram_callback; on SHOW_SLOTS saves pending_booking (service_id, booking_date, party_size) to customer.conversation_state before show_available_slots.
 
+### Alembic migrations
+
+- **alembic.ini** — Configured to defer `sqlalchemy.url` to `migrations/env.py` and `app.core.config.settings`.
+- **migrations/env.py** — Uses `Settings.NEON_DATABASE_URL` (fallback `sqlite:///./alembic.db`) and `Base.metadata` for autogenerate; `compare_type=True`.
+- **migrations/versions/8f69d917878c_initial_schema.py** — Initial schema for businesses, customers, services, staff, bookings, faqs, conversation_history, support_sessions (including `telegram_bot_token`). Fixed for PostgreSQL: `sa.Text()`/`sa.String()` in JSON/ARRAY, `server_default=sa.text('now()')`.
+- **Neon setup**: Create a project and DB in [Neon](https://neon.tech), copy the connection string into `.env` as `NEON_DATABASE_URL`, then run `alembic upgrade head` to apply migrations.
+
 ### Pending (to implement)
 
-- Alembic migrations (migrations folder, env.py, first migration).
 - Implement OpenAI/Gemini HTTP calls in ai_service providers.
 - Wire WhatsApp webhook body → message_handler.
 - Implement calendar_service OAuth and create_event.
