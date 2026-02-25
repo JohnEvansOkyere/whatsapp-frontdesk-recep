@@ -5,6 +5,7 @@ High-level skeleton only. All concrete behavior must follow CLAUDE.md.
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -150,15 +151,50 @@ def _get_provider() -> BaseProvider:
     raise RuntimeError(f"Unsupported AI_PROVIDER: {provider_name}")
 
 
-def _parse_action_and_data(raw_text: str) -> tuple[Optional[AIAction], Dict[str, Any] | None]:
-    """Parse ACTION tags from the model reply.
+# Pattern: "ACTION: NAME" or "ACTION: NAME { ... }" or "ACTION: NAME key=val key2=val2"
+_ACTION_LINE_RE = re.compile(
+    r"^\s*ACTION:\s*(\w+)(?:\s+\{([^}]*)\}|\s+(.+))?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
-    High-level stub: callers must implement robust parsing that matches CLAUDE.md.
-    For now, this function does NOT attempt to parse concrete payloads.
+
+def _parse_action_and_data(raw_text: str) -> tuple[Optional[AIAction], Dict[str, Any] | None, str]:
+    """Parse ACTION tags from the model reply per CLAUDE.md.
+
+    Returns (action, data, reply_text_with_action_lines_stripped).
     """
+    action: Optional[AIAction] = None
+    data: Dict[str, Any] | None = None
+    lines = raw_text.split("\n")
+    kept_lines: list[str] = []
 
-    # Minimal, non-assuming implementation: no automatic parsing.
-    return None, None
+    for line in lines:
+        m = _ACTION_LINE_RE.match(line.strip())
+        if m:
+            name, brace_content, rest = m.group(1), m.group(2), m.group(3)
+            try:
+                action = AIAction(name.upper())
+            except ValueError:
+                kept_lines.append(line)
+                continue
+            # Optional payload: {service_id, date, party_size} or key=val key2=val2
+            if brace_content:
+                parts = [p.strip() for p in brace_content.split(",")]
+                data = {p: None for p in parts if p}
+            elif rest:
+                data = {}
+                for part in rest.split():
+                    if "=" in part:
+                        k, _, v = part.partition("=")
+                        data[k.strip()] = v.strip()
+            if not data:
+                data = None
+            # Don't add ACTION line to reply shown to user
+            continue
+        kept_lines.append(line)
+
+    clean_reply = "\n".join(kept_lines).strip()
+    return action, data, clean_reply or raw_text
 
 
 async def process_message(
@@ -170,17 +206,13 @@ async def process_message(
     This function is responsible only for:
     - Selecting the configured provider
     - Sending system_prompt + messages
-    - Returning a normalized AIResult
-
-    The full flow described in CLAUDE.md (loading conversation history,
-    building booking context, trimming to 20 messages, etc.) should be
-    implemented by the caller or a higher-level orchestrator.
+    - Parsing ACTION tags and returning a normalized AIResult (reply_text = conversational part only)
     """
 
     provider = _get_provider()
     raw_text = await provider.generate(system_prompt=system_prompt, messages=messages)
 
-    action, data = _parse_action_and_data(raw_text)
+    action, data, reply_text = _parse_action_and_data(raw_text)
 
-    return AIResult(reply_text=raw_text, action=action, data=data)
+    return AIResult(reply_text=reply_text, action=action, data=data)
 

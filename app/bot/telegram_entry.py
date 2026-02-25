@@ -10,9 +10,24 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from telegram import Bot
 
+from app.bot.handlers import appointments, booking, support
 from app.bot.handlers.message_handler import handle_incoming_message
 from app.channels.telegram import TelegramChannel
 from app.core.config import settings
+from app.services.ai_service import AIAction
+
+
+def _uuid_from_data(data: Dict[str, Any], key: str) -> UUID:
+    """Parse UUID from action payload; return nil UUID if missing/invalid."""
+    val = data.get(key)
+    if val is None:
+        return UUID(int=0)
+    if isinstance(val, UUID):
+        return val
+    try:
+        return UUID(str(val))
+    except (ValueError, TypeError):
+        return UUID(int=0)
 
 
 async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) -> None:
@@ -67,6 +82,47 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
         messages=messages,
     )
 
-    if result and result.reply_text:
-        await channel.send_message(str(chat_id), result.reply_text)
+    if result:
+        if result.reply_text:
+            await channel.send_message(str(chat_id), result.reply_text)
+
+        # Dispatch on action (CLAUDE Message Handler Flow)
+        recipient_id = str(chat_id)
+        data = result.data or {}
+        if result.action == AIAction.SHOW_SLOTS:
+            party_size = data.get("party_size")
+            if party_size is not None and not isinstance(party_size, int):
+                try:
+                    party_size = int(party_size)
+                except (ValueError, TypeError):
+                    party_size = None
+            await booking.show_available_slots(
+                channel,
+                recipient_id,
+                dummy_business_id,
+                _uuid_from_data(data, "service_id"),
+                data.get("date") or "",
+                party_size,
+            )
+        elif result.action == AIAction.SHOW_BOOKINGS:
+            await appointments.show_bookings(
+                channel, recipient_id, dummy_customer_id, dummy_business_id
+            )
+        elif result.action == AIAction.MANAGE_BOOKING:
+            await appointments.show_manage_options(
+                channel, recipient_id, _uuid_from_data(data, "booking_id")
+            )
+        elif result.action == AIAction.HUMAN_HANDOFF:
+            # TODO: use business.telegram_group_id and customer full_name
+            await support.initiate_handoff(
+                channel,
+                recipient_id,
+                group_id="0",
+                customer_id=dummy_customer_id,
+                customer_name="Customer",
+                last_message=text,
+            )
+        elif result.action == AIAction.CONFIRM_BOOKING:
+            # TODO: build args from data + DB (service name, price, etc.)
+            pass
 

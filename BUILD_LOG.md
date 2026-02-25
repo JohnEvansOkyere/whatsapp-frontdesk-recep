@@ -43,7 +43,7 @@ Document every change and addition. Update this file whenever code or structure 
   - `handlers/faq.py` — `reply_faq`.
   - `handlers/support.py` — `initiate_handoff` (sends to group + customer).
   - `bot.py` — Entry for `python -m app.bot.bot`; main() placeholder.
-  - `telegram_entry.py` — `handle_telegram_update` orchestration: parses basic text messages, builds minimal system prompt, calls `handle_incoming_message`, and replies via `TelegramChannel` (business/customer mapping still TODO).
+  - `telegram_entry.py` — `handle_telegram_update`: parses message, calls AI, sends reply; **dispatches on AIResult.action** to booking.show_available_slots, appointments.show_bookings/show_manage_options, support.initiate_handoff (CONFIRM_BOOKING left as pass). Helper `_uuid_from_data` for action payloads.
 
 - **app/services/**
   - `booking_service.py` — `get_available_slots`, `create_booking`, `cancel_booking` (stubs).
@@ -51,7 +51,7 @@ Document every change and addition. Update this file whenever code or structure 
   - `reminder_service.py` — `schedule_reminders`, `cancel_reminders` (cancel_reminders implemented).
   - `faq_service.py` — `get_faqs_for_business` (stub).
 
-- **app/services/ai_service.py** (existing) — Multi-provider (OpenAI, Groq, Gemini), `process_message`, `AIAction`, `AIResult`; **GroqProvider.generate now calls https://api.groq.com/openai/v1/chat/completions via httpx**.
+- **app/services/ai_service.py** — Multi-provider (OpenAI, Groq, Gemini), `process_message`, `AIAction`, `AIResult`; GroqProvider via httpx; **ACTION parsing**: `_parse_action_and_data` detects ACTION: SHOW_SLOTS, SHOW_BOOKINGS, MANAGE_BOOKING, HUMAN_HANDOFF, CONFIRM_BOOKING and optional payload `{...}` or key=val; reply_text returned is conversational part only (ACTION lines stripped).
 
 - **.env.example** — All env vars from CLAUDE; AI_PROVIDER=groq, AI_MODEL=llama-3.1-8b-instant.
 
