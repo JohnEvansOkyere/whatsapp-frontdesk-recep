@@ -1,5 +1,6 @@
 """Telegram and WhatsApp webhook endpoints. No business logic — delegate to bot/services."""
 from typing import Any, Dict
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,16 +11,17 @@ from app.bot.telegram_entry import handle_telegram_update
 router = APIRouter(prefix="/webhook", tags=["webhooks"])
 
 
-@router.post("/telegram")
+@router.post("/telegram/{business_id}")
 async def telegram_webhook(
+    business_id: UUID,
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Receive Telegram updates. Body format: Telegram Update object."""
+    """Receive Telegram updates for a specific business. Body: Telegram Update object."""
 
     update: Dict[str, Any] = await request.json()
-    # High-level orchestration; DB details handled inside handle_telegram_update.
-    await handle_telegram_update(update, session)
+    # Orchestrate using the business identified in the path.
+    await handle_telegram_update(update, session, business_id)
     return Response(status_code=200)
 
 

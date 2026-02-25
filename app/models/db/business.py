@@ -35,6 +35,8 @@ class Business(Base, UUIDMixin, TimestampMixin):
         Enum(BusinessTypeEnum),
         nullable=False,
     )
+    # Per-business Telegram bot token (each client uses their own bot)
+    telegram_bot_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telegram_group_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     google_calendar_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     google_credentials: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

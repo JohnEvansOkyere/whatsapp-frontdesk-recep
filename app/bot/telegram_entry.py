@@ -16,7 +16,7 @@ from app.channels.telegram import TelegramChannel
 from app.core.config import settings
 from app.models.db.conversation import MessageRoleEnum
 from app.services.ai_service import AIAction
-from app.services.business_service import get_first_active_business
+from app.services.business_service import get_business_by_id
 from app.services.conversation_service import (
     add_message,
     get_recent_messages,
@@ -46,7 +46,11 @@ def _uuid_from_data(data: Dict[str, Any], key: str) -> UUID:
         return UUID(int=0)
 
 
-async def handle_telegram_callback(update: Dict[str, Any], session: AsyncSession) -> None:
+async def handle_telegram_callback(
+    update: Dict[str, Any],
+    session: AsyncSession,
+    business_id: UUID,
+) -> None:
     """Handle inline button callbacks: slot selection, confirm_booking, cancel_booking."""
     from sqlalchemy import select
     from app.models.db import Customer, Service
@@ -61,7 +65,12 @@ async def handle_telegram_callback(update: Dict[str, Any], session: AsyncSession
     if not chat_id or not telegram_id:
         return
 
-    bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+    business = await get_business_by_id(session, business_id)
+    if not business:
+        return
+
+    token = business.telegram_bot_token or settings.TELEGRAM_BOT_TOKEN
+    bot = Bot(token=token)
     channel = TelegramChannel(bot=bot)
     recipient_id = str(chat_id)
     try:
@@ -69,10 +78,7 @@ async def handle_telegram_callback(update: Dict[str, Any], session: AsyncSession
     except Exception:
         pass
 
-    business = await get_first_active_business(session)
-    if not business:
-        await channel.send_message(recipient_id, "No business configured.")
-        return
+    # business already loaded above
     customer = await get_or_create_customer_by_telegram(session, telegram_id, None)
     state = dict(customer.conversation_state or {})
     pending = state.get("pending_booking") or {}
@@ -148,11 +154,15 @@ async def handle_telegram_callback(update: Dict[str, Any], session: AsyncSession
     )
 
 
-async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) -> None:
+async def handle_telegram_update(
+    update: Dict[str, Any],
+    session: AsyncSession,
+    business_id: UUID,
+) -> None:
     """Process a Telegram Update end-to-end: message or callback_query."""
 
     if update.get("callback_query"):
-        await handle_telegram_callback(update, session)
+        await handle_telegram_callback(update, session, business_id)
         return
 
     message = update.get("message") or update.get("edited_message") or {}
@@ -163,17 +173,20 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
     if chat_id is None or not text:
         return
 
-    bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+    business = await get_business_by_id(session, business_id)
+    if not business:
+        bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+        channel = TelegramChannel(bot=bot)
+        await channel.send_message(str(chat_id), "No business configured yet. Please try again later.")
+        return
+
+    token = business.telegram_bot_token or settings.TELEGRAM_BOT_TOKEN
+    bot = Bot(token=token)
     channel = TelegramChannel(bot=bot)
     recipient_id = str(chat_id)
     telegram_id = str(chat_id)
     from_user = message.get("from") or {}
     full_name = from_user.get("first_name") or from_user.get("last_name") or None
-
-    business = await get_first_active_business(session)
-    if not business:
-        await channel.send_message(recipient_id, "No business configured yet. Please try again later.")
-        return
 
     customer = await get_or_create_customer_by_telegram(session, telegram_id, full_name)
     business_id = business.id
