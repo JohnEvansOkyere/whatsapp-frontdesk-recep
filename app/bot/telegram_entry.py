@@ -46,23 +46,115 @@ def _uuid_from_data(data: Dict[str, Any], key: str) -> UUID:
         return UUID(int=0)
 
 
+async def handle_telegram_callback(update: Dict[str, Any], session: AsyncSession) -> None:
+    """Handle inline button callbacks: slot selection, confirm_booking, cancel_booking."""
+    from sqlalchemy import select
+    from app.models.db import Customer, Service
+
+    cq = update.get("callback_query") or {}
+    callback_id = cq.get("id")
+    data = (cq.get("data") or "").strip()
+    from_user = cq.get("from") or {}
+    telegram_id = str(from_user.get("id", ""))
+    msg = cq.get("message") or {}
+    chat_id = msg.get("chat", {}).get("id")
+    if not chat_id or not telegram_id:
+        return
+
+    bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+    channel = TelegramChannel(bot=bot)
+    recipient_id = str(chat_id)
+    try:
+        await bot.answer_callback_query(callback_id)
+    except Exception:
+        pass
+
+    business = await get_first_active_business(session)
+    if not business:
+        await channel.send_message(recipient_id, "No business configured.")
+        return
+    customer = await get_or_create_customer_by_telegram(session, telegram_id, None)
+    state = dict(customer.conversation_state or {})
+    pending = state.get("pending_booking") or {}
+
+    if data == "cancel_booking":
+        state["pending_booking"] = {}
+        customer.conversation_state = state
+        await channel.send_message(recipient_id, "Booking cancelled. Start over whenever you like.")
+        return
+
+    if data == "confirm_booking":
+        if not pending.get("service_id") or not pending.get("time"):
+            await channel.send_message(recipient_id, "No booking to confirm. Please pick a time first.")
+            return
+        service_id = pending.get("service_id")
+        booking_date = pending.get("booking_date") or ""
+        booking_time = pending.get("time", "")
+        party_size = pending.get("party_size")
+        special_requests = pending.get("special_requests")
+        if isinstance(service_id, UUID):
+            service_id = str(service_id)
+        await booking.on_booking_confirmed(
+            session,
+            channel,
+            recipient_id,
+            business.id,
+            customer.id,
+            {
+                "service_id": service_id,
+                "booking_date": booking_date,
+                "booking_time": booking_time,
+                "party_size": party_size,
+                "special_requests": special_requests,
+            },
+        )
+        state["pending_booking"] = {}
+        customer.conversation_state = state
+        return
+
+    # Assume data is a slot time (e.g. "19:00:00" or "19:00")
+    if not pending.get("service_id") or not pending.get("booking_date"):
+        await channel.send_message(recipient_id, "Please pick a time from the list above.")
+        return
+    pending["time"] = data
+    state["pending_booking"] = pending
+    customer.conversation_state = state
+
+    service_id_val = pending.get("service_id")
+    if isinstance(service_id_val, str):
+        try:
+            service_id_uuid = UUID(service_id_val)
+        except ValueError:
+            await channel.send_message(recipient_id, "Invalid selection. Please start again.")
+            return
+    else:
+        service_id_uuid = service_id_val
+    service_result = await session.execute(
+        select(Service).where(Service.id == service_id_uuid, Service.business_id == business.id).limit(1)
+    )
+    service = service_result.scalars().first()
+    service_name = service.name if service else "Service"
+    price_str = f"{service.price}" if service and getattr(service, "price", None) is not None else "Pay at venue"
+    await booking.show_confirmation(
+        channel,
+        recipient_id,
+        business.name,
+        service_name,
+        party_size=pending.get("party_size"),
+        formatted_date=pending.get("booking_date", ""),
+        time_str=data,
+        price_str=price_str,
+        requests_str=pending.get("special_requests") or "None",
+    )
+
+
 async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) -> None:
-    """Process a Telegram Update end-to-end.
+    """Process a Telegram Update end-to-end: message or callback_query."""
 
-    Responsibilities (per CLAUDE Message Handler Flow):
-    - Get or create customer from Telegram user/chat
-    - Resolve business_id for this bot/chat
-    - Check active support_session; if active, forward to group and return
-    - Load last 20 messages + build system prompt from DB
-    - Call ai_service.process_message via handle_incoming_message
-    - Dispatch actions (SHOW_SLOTS, SHOW_BOOKINGS, etc.) via booking/appointments/support handlers
+    if update.get("callback_query"):
+        await handle_telegram_callback(update, session)
+        return
 
-    This function intentionally leaves DB details and mappings as TODOs, but
-    provides a minimal working loop for development.
-    """
-
-    # Extract chat_id and text from a basic message update.
-    # More update types (callbacks, edited messages) can be added later.
     message = update.get("message") or update.get("edited_message") or {}
     chat = message.get("chat") or {}
     chat_id = chat.get("id")
@@ -139,12 +231,23 @@ async def handle_telegram_update(update: Dict[str, Any], session: AsyncSession) 
                     party_size = int(party_size)
                 except (ValueError, TypeError):
                     party_size = None
+            service_id = _uuid_from_data(data, "service_id")
+            booking_date = data.get("date") or ""
+            if service_id.int:
+                customer.conversation_state = {
+                    **(customer.conversation_state or {}),
+                    "pending_booking": {
+                        "service_id": str(service_id),
+                        "booking_date": booking_date,
+                        "party_size": party_size,
+                    },
+                }
             await booking.show_available_slots(
                 channel,
                 recipient_id,
                 business_id,
-                _uuid_from_data(data, "service_id"),
-                data.get("date") or "",
+                service_id,
+                booking_date,
                 party_size,
                 session=session,
             )

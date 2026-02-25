@@ -70,13 +70,19 @@ Document every change and addition. Update this file whenever code or structure 
 - **app/bot/handlers/booking.py** — `show_available_slots` calls `get_available_slots`, sends slot buttons via channel; accepts `session` and passes to service.
 - **app/bot/keyboards.py** — Slot buttons set `action` to time string for callback_data.
 
+### Added (booking completion)
+
+- **booking_service.create_booking** — Race check, RST-/HST- reference, insert Booking (status=confirmed). **update_booking_reminder_jobs**, **cancel_booking** (cancel reminders, set status=cancelled).
+- **reminder_service.schedule_reminders** — 24h and 1h before booking via AsyncIOScheduler; async jobs send Telegram reminder messages. **cancel_reminders** unchanged.
+- **booking handler on_booking_confirmed** — Calls create_booking, schedule_reminders, update_booking_reminder_jobs, new_booking_notification to group, confirmation message to customer.
+- **telegram_entry handle_telegram_callback** — Handles callback_query: slot time → save time to pending_booking, show_confirmation; confirm_booking → on_booking_confirmed, clear pending; cancel_booking → clear pending. **handle_telegram_update** routes callback_query to handle_telegram_callback; on SHOW_SLOTS saves pending_booking (service_id, booking_date, party_size) to customer.conversation_state before show_available_slots.
+
 ### Pending (to implement)
 
 - Alembic migrations (migrations folder, env.py, first migration).
 - Implement OpenAI/Gemini HTTP calls in ai_service providers.
 - Wire WhatsApp webhook body → message_handler.
 - Implement calendar_service OAuth and create_event.
-- Implement reminder_service schedule_reminders (APScheduler jobs).
 - Tests: test_booking, test_ai_service, test_channels.
 - Procfile, README content.
 
