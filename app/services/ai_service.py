@@ -61,9 +61,10 @@ class BaseProvider:
 
 
 class GroqProvider(BaseProvider):
-    """Groq implementation placeholder.
+    """Groq implementation using OpenAI-compatible chat completions API.
 
-    Must call Groq's chat completion endpoint using httpx, never requests.
+    Endpoint: POST https://api.groq.com/openai/v1/chat/completions
+    Docs: console.groq.com/docs
     """
 
     def __init__(self, api_key: str, model: str) -> None:
@@ -75,17 +76,34 @@ class GroqProvider(BaseProvider):
         system_prompt: str,
         messages: List[Dict[str, str]],
     ) -> str:
-        # High-level placeholder; actual HTTP call intentionally omitted.
-        # Implementors should:
-        # - POST to Groq's chat completions endpoint
-        # - Pass self.model as the model name
-        # - Include system_prompt and messages in the request body
-        # - Return the assistant's text content
-        msg = (
-            "GroqProvider.generate is a high-level placeholder. "
-            "Implement the actual httpx call to Groq's chat API."
-        )
-        raise NotImplementedError(msg)
+        """Call Groq chat completions and return assistant text."""
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        groq_messages: list[dict[str, str]] = [
+            {"role": "system", "content": system_prompt},
+            *messages,
+        ]
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": groq_messages,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+        # OpenAI-compatible: choices[0].message.content
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise RuntimeError("Unexpected Groq response format") from exc
 
 
 class OpenAIProvider(BaseProvider):

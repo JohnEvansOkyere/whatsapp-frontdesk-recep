@@ -21,7 +21,7 @@ Document every change and addition. Update this file whenever code or structure 
 
 - **app/api/**
   - `dependencies.py` — Re-exports `get_db` from `app.core.database`.
-  - `routes/webhooks.py` — POST /webhook/telegram, GET/POST /webhook/whatsapp (stubs).
+  - `routes/webhooks.py` — POST /webhook/telegram (calls `handle_telegram_update`), GET/POST /webhook/whatsapp (stubs).
   - `routes/appointments.py` — GET/POST /api/bookings, PATCH/DELETE /api/bookings/{id}.
   - `routes/businesses.py` — GET/POST /api/businesses, PATCH /api/businesses/{id}, GET /api/businesses/{id}/slots.
   - `routes/onboarding.py` — GET /api/businesses/{id}/connect-calendar, GET /api/auth/google/callback.
@@ -43,6 +43,7 @@ Document every change and addition. Update this file whenever code or structure 
   - `handlers/faq.py` — `reply_faq`.
   - `handlers/support.py` — `initiate_handoff` (sends to group + customer).
   - `bot.py` — Entry for `python -m app.bot.bot`; main() placeholder.
+  - `telegram_entry.py` — `handle_telegram_update` orchestration stub (get/create customer, build prompt, call message_handler; all TODOs).
 
 - **app/services/**
   - `booking_service.py` — `get_available_slots`, `create_booking`, `cancel_booking` (stubs).
@@ -50,7 +51,7 @@ Document every change and addition. Update this file whenever code or structure 
   - `reminder_service.py` — `schedule_reminders`, `cancel_reminders` (cancel_reminders implemented).
   - `faq_service.py` — `get_faqs_for_business` (stub).
 
-- **app/services/ai_service.py** (existing) — Multi-provider (OpenAI, Groq, Gemini), `process_message`, `AIAction`, `AIResult`; provider stubs raise NotImplementedError.
+- **app/services/ai_service.py** (existing) — Multi-provider (OpenAI, Groq, Gemini), `process_message`, `AIAction`, `AIResult`; **GroqProvider.generate now calls https://api.groq.com/openai/v1/chat/completions via httpx**.
 
 - **.env.example** — All env vars from CLAUDE; AI_PROVIDER=groq, AI_MODEL=llama-3.1-8b-instant.
 
@@ -60,7 +61,7 @@ Document every change and addition. Update this file whenever code or structure 
 
 - Alembic migrations (migrations folder, env.py, first migration).
 - .env.example with all vars from CLAUDE.
-- Implement Groq/OpenAI/Gemini HTTP calls in ai_service providers.
+- Implement OpenAI/Gemini HTTP calls in ai_service providers.
 - Wire Telegram webhook body → message_handler (resolve business, customer, build system prompt).
 - Wire WhatsApp webhook body → message_handler.
 - Implement booking_service + datetime_utils slot logic.

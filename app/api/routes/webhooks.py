@@ -1,13 +1,25 @@
-"""Telegram and WhatsApp webhook endpoints. No business logic — delegate to services."""
-from fastapi import APIRouter, Request, Response
+"""Telegram and WhatsApp webhook endpoints. No business logic — delegate to bot/services."""
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import get_db
+from app.bot.telegram_entry import handle_telegram_update
 
 router = APIRouter(prefix="/webhook", tags=["webhooks"])
 
 
 @router.post("/telegram")
-async def telegram_webhook(request: Request) -> Response:
-    """Receive Telegram updates. Body format: Telegram Update object. Delegate to message_handler."""
-    # TODO: parse body, resolve business, get/create customer, call message_handler flow
+async def telegram_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """Receive Telegram updates. Body format: Telegram Update object."""
+
+    update: Dict[str, Any] = await request.json()
+    # High-level orchestration; DB details handled inside handle_telegram_update.
+    await handle_telegram_update(update, session)
     return Response(status_code=200)
 
 
@@ -19,7 +31,11 @@ async def whatsapp_verify(request: Request) -> Response:
 
 
 @router.post("/whatsapp")
-async def whatsapp_webhook(request: Request) -> Response:
+async def whatsapp_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+) -> Response:
     """Receive WhatsApp messages from Meta. Delegate to message_handler."""
     # TODO: parse body, resolve business from phone_number_id, get/create customer, call message_handler
+    _ = await request.json()
     return Response(status_code=200)
