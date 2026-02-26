@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Sidebar } from "./components/Sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,11 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Front Desk Dashboard",
-  description: "Configure and monitor your business",
+  title: "Front Desk - Hotel Management",
+  description: "AI-powered hotel booking and management dashboard",
 };
-
-import { DashboardNav } from "./components/DashboardNav";
 
 export default function RootLayout({
   children,
@@ -29,8 +28,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
-        <DashboardNav />
-        <main className="min-h-[calc(100vh-3.5rem)]">{children}</main>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
       </body>
     </html>
   );

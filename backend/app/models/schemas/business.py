@@ -5,10 +5,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class BusinessCreate(BaseModel):
-    """Register new business."""
-
     name: str
-    type: str  # restaurant | hostel
+    type: str  # restaurant | hostel | hotel
+    telegram_bot_token: str | None = None
     telegram_group_id: str | None = None
     working_hours: dict[str, list[str]]
     slot_duration_minutes: int = 30
@@ -18,9 +17,9 @@ class BusinessCreate(BaseModel):
 
 
 class BusinessUpdate(BaseModel):
-    """Partial update."""
-
     name: str | None = None
+    type: str | None = None
+    telegram_bot_token: str | None = None
     telegram_group_id: str | None = None
     working_hours: dict[str, list[str]] | None = None
     slot_duration_minutes: int | None = None
@@ -30,8 +29,6 @@ class BusinessUpdate(BaseModel):
 
 
 class BusinessResponse(BaseModel):
-    """Business in API response."""
-
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -43,10 +40,9 @@ class BusinessResponse(BaseModel):
 
 
 class BusinessDetailResponse(BusinessResponse):
-    """Business with full details for dashboard edit."""
-
     working_hours: dict[str, list[str]]
     slot_duration_minutes: int
     timezone: str
     location: str | None
     phone: str | None
+    telegram_bot_token: str | None = None

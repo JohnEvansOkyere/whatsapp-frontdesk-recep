@@ -29,13 +29,25 @@ async def show_available_slots(
     """Get working hours, generate slots, exclude booked, send as buttons (max 8 per page)."""
     if not session:
         return
+
+    service_result = await session.execute(
+        select(Service).where(Service.id == service_id, Service.business_id == business_id).limit(1)
+    )
+    service = service_result.scalars().first()
+
     slots = await get_available_slots(session, business_id, service_id, booking_date)
     if not slots:
         await channel.send_message(recipient_id, "No available slots for that date. Try another day?")
         return
     buttons = slot_buttons(slots, page=0, per_page=8)
-    text = f"Available slots for {booking_date}:\n\nPick a time:"
-    await channel.send_buttons(recipient_id, text, buttons)
+
+    header = f"Available times for {booking_date}"
+    if service:
+        header += f"\nRoom: {service.name}"
+        if getattr(service, "base_price_per_night", None):
+            header += f" - GHS {service.base_price_per_night}/night"
+    header += "\n\nPick a time:"
+    await channel.send_buttons(recipient_id, header, buttons)
 
 
 async def show_confirmation(
@@ -148,7 +160,16 @@ async def on_booking_confirmed(
             ),
         )
 
+    price_info = ""
+    if service and getattr(service, "base_price_per_night", None):
+        price_info = f"\nRate: GHS {service.base_price_per_night}/night"
+
     await channel.send_message(
         recipient_id,
-        f"✅ Booked! Your reference is {ref}. We'll send you a reminder before your appointment.",
+        f"Your reservation is confirmed!\n\n"
+        f"Reference: {ref}\n"
+        f"Room: {service_name}\n"
+        f"Date: {booking_date} at {booking_time}{price_info}\n\n"
+        f"We will send you a reminder before your stay. "
+        f"If you need to modify or cancel, just message us.",
     )

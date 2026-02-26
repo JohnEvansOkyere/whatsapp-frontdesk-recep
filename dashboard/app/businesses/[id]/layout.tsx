@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { BusinessNav } from "@/app/components/BusinessNav";
 
+export const dynamic = "force-dynamic";
+
 export default async function BusinessLayout({
   children,
   params,
@@ -20,7 +22,7 @@ export default async function BusinessLayout({
   return (
     <>
       <BusinessNav businessId={id} businessName={business.name} />
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</div>
+      <div className="p-8">{children}</div>
     </>
   );
 }

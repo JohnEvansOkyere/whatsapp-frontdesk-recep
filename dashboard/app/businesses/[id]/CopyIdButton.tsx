@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Copy, Check } from "lucide-react";
 
 export function CopyIdButton({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
 
-  const copy = async () => {
+  const handleCopy = async () => {
     await navigator.clipboard.writeText(id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -13,11 +14,11 @@ export function CopyIdButton({ id }: { id: string }) {
 
   return (
     <button
-      type="button"
-      onClick={copy}
-      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      onClick={handleCopy}
+      className="rounded-lg p-1.5 transition-colors"
+      style={{ color: copied ? "var(--success)" : "var(--text-muted)" }}
     >
-      {copied ? "Copied" : "Copy"}
+      {copied ? <Check size={14} /> : <Copy size={14} />}
     </button>
   );
 }

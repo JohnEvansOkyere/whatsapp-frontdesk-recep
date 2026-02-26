@@ -34,6 +34,7 @@ engine = create_async_engine(
     database_url,
     echo=settings.ENVIRONMENT == "development",
     connect_args=connect_args,
+    pool_pre_ping=True,
 )
 
 async_session_maker = async_sessionmaker(

@@ -81,11 +81,15 @@ async def get_available_slots(
 
 
 def _generate_booking_reference(business_type: BusinessTypeEnum, day: date) -> str:
-    """RST-YYYYMMDD-XXXX or HST-YYYYMMDD-XXXX with XXXX = 4 random alphanumeric."""
-    prefix = "RST-" if business_type == BusinessTypeEnum.restaurant else "HST-"
+    prefixes = {
+        BusinessTypeEnum.restaurant: "RST",
+        BusinessTypeEnum.hostel: "HST",
+        BusinessTypeEnum.hotel: "HTL",
+    }
+    prefix = prefixes.get(business_type, "BKG")
     date_str = day.strftime("%Y%m%d")
     suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"{prefix}{date_str}-{suffix}"
+    return f"{prefix}-{date_str}-{suffix}"
 
 
 async def create_booking(

@@ -3,11 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { ArrowLeft, Building2, Hotel, UtensilsCrossed } from "lucide-react";
+import Link from "next/link";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const DAY_LABELS: Record<string, string> = {
+  mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday",
+  fri: "Friday", sat: "Saturday", sun: "Sunday",
+};
 const defaultHours: Record<string, string[]> = Object.fromEntries(
-  DAYS.map((d) => [d, ["09:00", "21:00"]])
+  DAYS.map((d) => [d, ["06:00", "23:00"]])
 );
+
+const businessTypes = [
+  { value: "hotel" as const, label: "Hotel", icon: Hotel, desc: "Rooms, suites, and hotel services" },
+  { value: "restaurant" as const, label: "Restaurant", icon: UtensilsCrossed, desc: "Table reservations and dining" },
+  { value: "hostel" as const, label: "Hostel", icon: Building2, desc: "Budget rooms and dormitories" },
+];
 
 export default function NewBusinessPage() {
   const router = useRouter();
@@ -15,12 +27,12 @@ export default function NewBusinessPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
-    type: "restaurant" as "restaurant" | "hostel",
+    type: "hotel" as "restaurant" | "hostel" | "hotel",
     working_hours: defaultHours,
-    slot_duration_minutes: 30,
     timezone: "Africa/Accra",
     location: "",
     phone: "",
+    telegram_bot_token: "",
     telegram_group_id: "",
   });
 
@@ -29,152 +41,252 @@ export default function NewBusinessPage() {
     setError(null);
     setLoading(true);
     try {
-      await api.businesses.create({
+      const biz = await api.businesses.create({
         name: form.name.trim(),
         type: form.type,
         working_hours: form.working_hours,
-        slot_duration_minutes: form.slot_duration_minutes,
         timezone: form.timezone,
         location: form.location.trim() || null,
         phone: form.phone.trim() || null,
+        telegram_bot_token: form.telegram_bot_token.trim() || null,
         telegram_group_id: form.telegram_group_id.trim() || null,
       });
-      router.push("/businesses");
-      router.refresh();
+      router.push(`/businesses/${biz.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create business");
+      setError(err instanceof Error ? err.message : "Failed to create property");
     } finally {
       setLoading(false);
     }
   };
 
+  const setDayHours = (day: string, index: 0 | 1, value: string) => {
+    setForm((f) => {
+      const next = { ...f.working_hours };
+      const arr = [...(next[day] ?? ["06:00", "23:00"])];
+      arr[index] = value;
+      next[day] = arr;
+      return { ...f, working_hours: next };
+    });
+  };
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Add business</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Create a business to configure the bot and track bookings.
-      </p>
+    <div className="p-8">
+      <Link
+        href="/businesses"
+        className="mb-6 inline-flex items-center gap-2 text-sm transition-colors"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        <ArrowLeft size={16} />
+        Back to Properties
+      </Link>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+          Add new property
+        </h1>
+        <p className="text-sm mb-8" style={{ color: "var(--text-secondary)" }}>
+          Set up your hotel, restaurant, or hostel. The AI bot will use these details to serve your guests.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {error && (
+            <div
+              className="rounded-lg border p-4 text-sm"
+              style={{ background: "var(--error-bg)", borderColor: "var(--error)", color: "var(--error)" }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* Property Type */}
+          <div>
+            <label className="block text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+              Property Type
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {businessTypes.map(({ value, label, icon: Icon, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, type: value }))}
+                  className="rounded-xl border p-4 text-left transition-all"
+                  style={{
+                    background: form.type === value ? "var(--accent-muted)" : "var(--bg-card)",
+                    borderColor: form.type === value ? "var(--accent)" : "var(--border)",
+                  }}
+                >
+                  <Icon
+                    size={24}
+                    style={{ color: form.type === value ? "var(--accent)" : "var(--text-muted)" }}
+                  />
+                  <p
+                    className="mt-2 text-sm font-semibold"
+                    style={{ color: form.type === value ? "var(--accent)" : "var(--text-primary)" }}
+                  >
+                    {label}
+                  </p>
+                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    {desc}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-slate-700">
-            Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
+          {/* Property Name */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+              Property Name
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Kempinski Hotel Gold Coast City"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="block w-full"
+            />
+          </div>
 
-        <div>
-          <label htmlFor="type" className="block text-sm font-medium text-slate-700">
-            Type
-          </label>
-          <select
-            id="type"
-            value={form.type}
-            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "restaurant" | "hostel" }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          >
-            <option value="restaurant">Restaurant</option>
-            <option value="hostel">Hostel</option>
-          </select>
-        </div>
+          {/* Location & Phone */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+                Location
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Accra, Ghana"
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                className="block w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+                Phone
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. +233 30 263 1000"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                className="block w-full"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label htmlFor="timezone" className="block text-sm font-medium text-slate-700">
-            Timezone
-          </label>
-          <input
-            id="timezone"
-            type="text"
-            value={form.timezone}
-            onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
+          {/* Timezone */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+              Timezone
+            </label>
+            <input
+              type="text"
+              value={form.timezone}
+              onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
+              className="block w-full"
+            />
+          </div>
 
-        <div>
-          <label htmlFor="location" className="block text-sm font-medium text-slate-700">
-            Location
-          </label>
-          <input
-            id="location"
-            type="text"
-            value={form.location}
-            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
+          {/* Working Hours */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+              Operating Hours
+            </label>
+            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+              Front desk / reception hours for each day of the week.
+            </p>
+            <div
+              className="rounded-xl border p-4 space-y-2"
+              style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+            >
+              {DAYS.map((day) => (
+                <div key={day} className="flex items-center gap-3">
+                  <span className="w-24 text-sm" style={{ color: "var(--text-secondary)" }}>
+                    {DAY_LABELS[day]}
+                  </span>
+                  <input
+                    type="time"
+                    value={form.working_hours[day]?.[0] ?? "06:00"}
+                    onChange={(e) => setDayHours(day, 0, e.target.value)}
+                    className="w-28 text-sm"
+                  />
+                  <span style={{ color: "var(--text-muted)" }}>to</span>
+                  <input
+                    type="time"
+                    value={form.working_hours[day]?.[1] ?? "23:00"}
+                    onChange={(e) => setDayHours(day, 1, e.target.value)}
+                    className="w-28 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
 
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
-            Phone
-          </label>
-          <input
-            id="phone"
-            type="text"
-            value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
+          {/* Telegram Config */}
+          <div>
+            <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+              Telegram Integration
+            </h3>
+            <div
+              className="rounded-xl border p-4 space-y-4"
+              style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
+            >
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                  Bot Token
+                </label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="Paste your bot token from @BotFather"
+                  value={form.telegram_bot_token}
+                  onChange={(e) => setForm((f) => ({ ...f, telegram_bot_token: e.target.value }))}
+                  className="block w-full text-sm"
+                />
+                <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  Each property needs its own Telegram bot. Create one via @BotFather.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                  Staff Group Chat ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. -1001234567890"
+                  value={form.telegram_group_id}
+                  onChange={(e) => setForm((f) => ({ ...f, telegram_group_id: e.target.value }))}
+                  className="block w-full text-sm"
+                />
+                <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  For staff notifications and human handoff. Add the bot to your staff group.
+                </p>
+              </div>
+            </div>
+          </div>
 
-        <div>
-          <label htmlFor="slot_duration_minutes" className="block text-sm font-medium text-slate-700">
-            Slot duration (minutes)
-          </label>
-          <input
-            id="slot_duration_minutes"
-            type="number"
-            min={15}
-            step={15}
-            value={form.slot_duration_minutes}
-            onChange={(e) => setForm((f) => ({ ...f, slot_duration_minutes: Number(e.target.value) }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="telegram_group_id" className="block text-sm font-medium text-slate-700">
-            Telegram group ID (optional)
-          </label>
-          <input
-            id="telegram_group_id"
-            type="text"
-            value={form.telegram_group_id}
-            onChange={(e) => setForm((f) => ({ ...f, telegram_group_id: e.target.value }))}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          />
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {loading ? "Creating..." : "Create business"}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/businesses")}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+              style={{ background: "var(--accent)", color: "var(--bg-primary)" }}
+            >
+              {loading ? "Creating..." : "Create Property"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/businesses")}
+              className="rounded-lg border px-6 py-2.5 text-sm font-medium transition-colors"
+              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

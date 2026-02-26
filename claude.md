@@ -121,7 +121,8 @@ project/
 ```
 id                    UUID PK
 name                  str
-type                  enum: restaurant, hostel
+type                  enum: restaurant, hostel, hotel
+telegram_bot_token    str nullable  -- per-business Telegram bot token (overrides global default)
 telegram_group_id     str          -- for staff notifications
 google_calendar_id    str nullable
 google_credentials    JSON nullable -- encrypted OAuth tokens
@@ -140,12 +141,18 @@ created_at            timestamp
 ```
 id                    UUID PK
 business_id           FK -> businesses
-name                  str          -- "Table for 2", "Deluxe Room", "General Checkup"
+name                  str          -- "Table for 2", "Deluxe Room", "Executive Suite"
 description           str nullable
 duration_minutes      int
 price                 decimal nullable
 capacity              int nullable -- for tables: how many people
 is_active             bool default true
+image_url             str nullable -- hero image for dashboards and AI descriptions
+max_occupancy         int nullable -- max guests for room type
+bed_type              str nullable -- "King", "Queen", "Twin", etc.
+amenities             array of str nullable -- ["WiFi", "Breakfast", "Pool", "Airport Shuttle"]
+base_price_per_night  decimal nullable -- hotel nightly rate; price can be used for restaurant services
+room_count            int nullable -- how many rooms of this type exist in inventory
 ```
 
 ### staff
@@ -179,9 +186,18 @@ staff_id              FK -> staff nullable
 booking_date          date
 booking_time          time
 party_size            int nullable  -- for restaurants
-status                enum: pending, confirmed, cancelled, completed
+check_in_date         date nullable -- for hotels/hostels
+check_out_date        date nullable -- for hotels/hostels
+num_guests            int nullable  -- for hotels/hostels
+num_nights            int nullable  -- for hotels/hostels
+total_price           decimal nullable -- full stay amount, if known
+guest_name            str nullable -- override customer.full_name if needed
+guest_email           str nullable
+guest_phone           str nullable
+notes                 text nullable -- internal notes for staff
+status                enum: pending, confirmed, cancelled, completed, no_show
 google_event_id       str nullable
-booking_reference     str unique   -- format: RST-YYYYMMDD-XXXX or HST-YYYYMMDD-XXXX
+booking_reference     str unique   -- format: RST-YYYYMMDD-XXXX (restaurant), HST-YYYYMMDD-XXXX (hostel), HTL-YYYYMMDD-XXXX (hotel)
 special_requests      str nullable
 reminder_24h_job_id   str nullable -- APScheduler job id
 reminder_1h_job_id    str nullable -- APScheduler job id
@@ -321,6 +337,11 @@ YOUR BEHAVIOR:
 CURRENT BOOKING CONTEXT:
 {booking_context}
 ```
+
+For **hotel** businesses the system prompt is specialised to act as a premium hotel concierge:
+- Highlights room types, amenities, nightly rates, and total stay amount
+- Guides the guest to provide check-in / check-out dates and number of guests
+- Presents a short list of suitable room options (Standard, Deluxe, Executive Suite, etc.) with descriptions and pricing before calling `ACTION: SHOW_SLOTS`
 
 ### Actions AI can return:
 ```
@@ -546,9 +567,16 @@ PATCH  /api/bookings/{id}                        Reschedule
 DELETE /api/bookings/{id}                        Cancel
 
 GET    /api/businesses                           List businesses
-POST   /api/businesses                           Register new business
+POST   /api/businesses                           Register new business (restaurant/hostel/hotel)
 PATCH  /api/businesses/{id}                      Update business
-GET    /api/businesses/{id}/slots?date=YYYY-MM-DD Available slots
+GET    /api/businesses/{id}                      Get full business details (for dashboard)
+GET    /api/businesses/{id}/slots?date=YYYY-MM-DD[&service_id=UUID]  Available slots for a specific service/room
+GET    /api/businesses/{id}/services             List services / room types for a business
+POST   /api/businesses/{id}/services             Create service / room type
+PATCH  /api/businesses/{id}/services/{service_id} Update service / room type
+DELETE /api/businesses/{id}/services/{service_id} Delete service / room type
+GET    /api/businesses/{id}/bookings[?status=confirmed|pending|cancelled|completed|no_show]
+                                                 List bookings for a business with rich guest + room info
 
 GET    /api/businesses/{id}/connect-calendar     Start OAuth
 GET    /api/auth/google/callback                 OAuth callback
@@ -670,11 +698,18 @@ GOOGLE_REDIRECT_URI=
 - Extra fields: party_size, special_requests
 - Typical slot duration: 90 minutes
 
-### Hostel / Hotel
+### Hostel
 - Service = room type ("Dorm Bed", "Private Room", "Family Room")
 - booking_reference prefix: HST-
 - Extra fields: number of nights, check-in date, check-out date
 - Typical slot duration: 1440 minutes (full day)
+
+### Hotel
+- Service = hotel room type ("Standard Room", "Deluxe Room", "Executive Suite", "Presidential Suite")
+- booking_reference prefix: HTL-
+- Stronger emphasis on amenities (WiFi, breakfast, pool, airport shuttle), occupancy, and base nightly rate
+- Booking flow expects check-in / check-out dates and number of guests
+- Dashboard shows room cards with images, amenities, nightly rate, and room inventory count
 
 ---
 
@@ -722,6 +757,50 @@ A web dashboard for business owners (clients) to configure their system and moni
 - **Easy to navigate**: Persistent nav (e.g. Business, Services, Bookings, FAQs, Staff, Settings/Channels); breadcrumbs where helpful; no deep mystery menus.
 - **Modern**: Clean layout, readable typography, consistent spacing, subtle use of color and hierarchy; responsive so it works on tablets.
 - **Professional**: No emojis in the UI. Copy and tone should feel human and product-like, not obviously AI-generated.
+
+### Current implementation (v1)
+
+The current dashboard is implemented as a **Next.js app** in the `dashboard/` folder and ships the following features:
+
+- **Global layout & navigation**
+  - Dark, hotel-style theme with gold accent, sidebar navigation (`Dashboard`, `Properties`, `Help`, `Settings`).
+  - Top-level dashboard (`/`) showing high-level stats and a grid of all properties.
+
+- **Properties (`/businesses`)**
+  - Card view of businesses with type (restaurant/hostel/hotel), active status, location, and phone.
+  - “Add Property” flow with:
+    - Property type selection (Hotel / Restaurant / Hostel).
+    - Location, phone, timezone.
+    - Operating hours (per-day time pickers).
+    - Telegram bot token and staff group chat ID (multi-tenant bot configuration).
+
+- **Per‑business workspace (`/businesses/{id}`)**
+  - Sub‑navigation: `Overview`, `Bookings`, `Rooms`, `FAQs`, `Settings`.
+  - **Overview**:
+    - Stats: total bookings, confirmed bookings, room types, FAQ count.
+    - Business details (ID with copy button, type, location, phone, timezone).
+    - Recent bookings summary.
+    - Preview grid of room types with images, nightly rate, occupancy, and inventory.
+  - **Rooms**:
+    - “Add Room Type” panel with:
+      - Name, description, image URL.
+      - Bed type, max occupancy, room count.
+      - Base price per night (GHS) and common amenity chips (WiFi, Breakfast, Pool, Airport Shuttle, etc.).
+    - Editable room cards for each service/room type showing:
+      - Photo or gradient header, name, description.
+      - Nightly rate, bed type, max guests, number of rooms.
+      - Amenity badges; inline edit + delete controls.
+  - **Bookings**:
+    - Rich table of reservations backed by `GET /api/businesses/{id}/bookings`.
+    - Status filters (all/confirmed/pending/cancelled/completed), search by guest / reference / room type.
+    - Columns: reference, guest (name + phone), room type, dates (or check‑in/out for hotels), guests, total, status badge.
+  - **FAQs**:
+    - Collapsible “Add FAQ” drawer with question + answer.
+    - List of FAQs as cards, each with delete control.
+  - **Settings**:
+    - General: name, location, phone, timezone.
+    - Operating hours editor (per‑day time pickers).
+    - Telegram integration: per‑business bot token and staff group chat ID.
 
 ### Technical notes
 - Dashboard is a separate frontend (e.g. React, Vue, or similar SPA) that consumes the existing FastAPI endpoints; or server-rendered pages (e.g. Jinja2) that call the same APIs.

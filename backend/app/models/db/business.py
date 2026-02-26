@@ -12,6 +12,7 @@ from app.models.db.base import Base, TimestampMixin, UUIDMixin
 class BusinessTypeEnum(str, enum.Enum):
     restaurant = "restaurant"
     hostel = "hostel"
+    hotel = "hotel"
 
 
 class ActiveChannelEnum(str, enum.Enum):

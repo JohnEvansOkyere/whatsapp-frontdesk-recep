@@ -1,5 +1,4 @@
-"""All user-facing message strings. No hardcoded strings in handlers or services — use keys or format from here."""
-from typing import Any
+"""All user-facing message strings. No hardcoded strings in handlers or services."""
 
 
 def confirmation_body(
@@ -11,19 +10,17 @@ def confirmation_body(
     price_str: str,
     requests_str: str,
 ) -> str:
-    """Booking confirmation text (see CLAUDE show_confirmation)."""
-    party_line = f"👥 Party size: {party_size}" if party_size is not None else ""
-    return f"""Please confirm your booking ✅
-
-🏢 {business_name}
-🍽️ {service_name}
-{party_line}
-📅 Date: {formatted_date}
-⏰ Time: {time_str}
-💰 Price: {price_str}
-📝 Special requests: {requests_str}
-
-[✅ Confirm Booking] [❌ Cancel]"""
+    guests_line = f"\nGuests: {party_size}" if party_size is not None else ""
+    return (
+        f"Please confirm your reservation:\n\n"
+        f"{business_name}\n"
+        f"Room: {service_name}{guests_line}\n"
+        f"Date: {formatted_date}\n"
+        f"Time: {time_str}\n"
+        f"Rate: {price_str}\n"
+        f"Special requests: {requests_str}\n\n"
+        f"[Confirm Booking] [Cancel]"
+    )
 
 
 def new_booking_notification(
@@ -36,53 +33,49 @@ def new_booking_notification(
     reference: str,
     requests: str,
 ) -> str:
-    """Notify business Telegram group of new booking (see CLAUDE on_booking_confirmed)."""
-    party_line = f"Party: {size}" if size else ""
-    return f"""📅 New Booking!
-Customer: {name} ({phone})
-Service: {service}
-Date: {date} at {time}
-{party_line}
-Ref: {reference}
-Special requests: {requests or 'none'}"""
+    party_line = f"\nGuests: {size}" if size else ""
+    return (
+        f"New Reservation\n"
+        f"Guest: {name} ({phone})\n"
+        f"Room: {service}\n"
+        f"Date: {date} at {time}{party_line}\n"
+        f"Ref: {reference}\n"
+        f"Requests: {requests or 'none'}"
+    )
 
 
 def support_request_notification(customer_name: str, last_message: str, customer_id: str) -> str:
-    """Notify group for support handoff (see CLAUDE initiate_handoff)."""
-    return f"""💬 Support Request!
-From: {customer_name}
-Last message: {last_message}
-Reply: /reply {customer_id} {{your message}}
-Close: /resolve {customer_id}"""
+    return (
+        f"Support Request\n"
+        f"From: {customer_name}\n"
+        f"Last message: {last_message}\n"
+        f"Reply: /reply {customer_id} {{your message}}\n"
+        f"Close: /resolve {customer_id}"
+    )
 
 
 def support_connected_to_customer() -> str:
-    """Tell customer they are connected to staff."""
-    return "You're connected! Our team will reply shortly 🙏"
+    return "You're now connected with our front desk team. Someone will reply shortly."
 
 
 def support_resolved_to_customer() -> str:
-    """After staff closes with /resolve."""
-    return "Glad we could help! Is there anything else? 😊"
+    return "Glad we could help! Is there anything else you need?"
 
 
 def reminder_24h(business_name: str, date: str, time: str, size: str, reference: str) -> str:
-    """24h before booking (see CLAUDE Reminders)."""
-    return f"""⏰ Reminder: You have a reservation tomorrow!
-
-🏢 {business_name}
-📅 {date} at {time}
-👥 Party of {size}
-Ref: {reference}
-
-Need to change anything? Just message us here!"""
+    return (
+        f"Reminder: You have a reservation tomorrow!\n\n"
+        f"{business_name}\n"
+        f"{date} at {time}\n"
+        f"Party of {size}\n"
+        f"Ref: {reference}\n\n"
+        f"Need to change anything? Just message us here."
+    )
 
 
 def reminder_1h(business_name: str) -> str:
-    """1h before booking."""
-    return f"⏰ Your reservation is in 1 hour at {business_name}.\nSee you soon! 🎉"
+    return f"Your reservation at {business_name} is in 1 hour. See you soon!"
 
 
 def connecting_support() -> str:
-    """When initiating human handoff."""
-    return "Connecting you with our team now 💬\nSomeone will be with you shortly!"
+    return "Connecting you with the front desk now. Someone will be with you shortly."
