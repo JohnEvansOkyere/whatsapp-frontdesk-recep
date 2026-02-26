@@ -28,3 +28,19 @@ alembic revision --autogenerate -m "description"
 ```
 
 See repo root **MIGRATIONS.md** for full guide.
+
+## Seed demo data (restaurant)
+
+To add realistic restaurant services (table types) and FAQs to a business:
+
+```bash
+python -m scripts.seed_restaurant
+```
+
+Uses the first restaurant in the DB. To target a specific business:
+
+```bash
+python -m scripts.seed_restaurant --business-id YOUR_UUID
+```
+
+Adds: Table for 2/4/6, Private dining; FAQs for hours, location, reservations, parking, dietary options, payment, dress code, events, kids, WiFi. If the business has no location set, also sets working hours (Tue–Sun 12:00–22:00) and a sample address/phone.

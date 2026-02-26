@@ -70,11 +70,17 @@ Full steps (creating the DB, connection string, troubleshooting): **[MIGRATIONS.
 
 ### 4. Run the API server
 
-From the **backend** directory:
+**Option A** — from the **backend** directory (required for `app` and `.env` to be found):
 
 ```bash
 cd backend
 uvicorn app.main:app --reload
+```
+
+**Option B** — from the repo root:
+
+```bash
+python run_backend.py
 ```
 
 - API: `http://localhost:8000`
