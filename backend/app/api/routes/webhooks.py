@@ -18,9 +18,12 @@ async def telegram_webhook(
     session: AsyncSession = Depends(get_db),
 ) -> Response:
     """Receive Telegram updates for a specific business. Body: Telegram Update object."""
-
-    update: Dict[str, Any] = await request.json()
-    # Orchestrate using the business identified in the path.
+    try:
+        update: Dict[str, Any] = await request.json()
+    except Exception:
+        return Response(status_code=200)
+    if not update:
+        return Response(status_code=200)
     await handle_telegram_update(update, session, business_id)
     return Response(status_code=200)
 

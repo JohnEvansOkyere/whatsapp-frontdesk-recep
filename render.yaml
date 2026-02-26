@@ -1,10 +1,12 @@
 # Render Blueprint — Web Service for Front Desk Bot API
 # Docs: https://docs.render.com/blueprint-spec
+# Backend lives in backend/; run all commands from that directory.
 services:
   - type: web
     name: frontdesk-bot-api
     runtime: python
     region: oregon
+    rootDir: backend
 
     buildCommand: pip install -r requirements.txt
     preDeployCommand: alembic upgrade head
@@ -16,3 +18,8 @@ services:
       # Add these in Render Dashboard → Environment (or use env var groups):
       # NEON_DATABASE_URL (required), TELEGRAM_BOT_TOKEN, GROQ_API_KEY
       # Optional: TELEGRAM_WEBHOOK_URL, OPENAI_API_KEY, GOOGLE_AI_API_KEY, SECRET_KEY, BASE_URL
+
+
+
+
+

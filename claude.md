@@ -5,12 +5,13 @@
 ---
 
 ## Quick Commands
-- Run server: `uvicorn app.main:app --reload`
-- Run migrations: `alembic upgrade head`
-- Create migration: `alembic revision --autogenerate -m "description"`
-- Install deps: `pip install -r requirements.txt`
-- Run tests: `pytest`
-- Run bot (polling mode for dev): `python -m app.bot.bot`
+All backend commands run from the **backend/** directory.
+- Run server: `cd backend && uvicorn app.main:app --reload`
+- Run migrations: `cd backend && alembic upgrade head`
+- Create migration: `cd backend && alembic revision --autogenerate -m "description"`
+- Install deps: `cd backend && pip install -r requirements.txt`
+- Run tests: `cd backend && pytest`
+- Run bot (polling mode for dev): `cd backend && python -m app.bot.bot`
 
 ---
 
@@ -48,68 +49,68 @@ Same codebase, different channel layer.
 ## Project Structure
 ```
 project/
-├── app/
-│   ├── main.py                  # FastAPI app entry point + webhook registration
-│   ├── channels/
-│   │   ├── base.py              # Abstract channel interface
-│   │   ├── telegram.py          # Telegram implementation
-│   │   └── whatsapp.py          # WhatsApp implementation (Meta Cloud API)
-│   ├── bot/
-│   │   ├── handlers/
-│   │   │   ├── message_handler.py   # All incoming messages enter here
-│   │   │   ├── booking.py           # Booking flow & slot display
-│   │   │   ├── appointments.py      # View/reschedule/cancel
-│   │   │   ├── faq.py               # FAQ handler
-│   │   │   └── support.py           # Human handoff
-│   │   ├── keyboards.py             # Buttons and inline keyboards
-│   │   ├── states.py                # Conversation state constants
-│   │   └── bot.py                   # Bot initialization
-│   ├── api/
-│   │   ├── routes/
-│   │   │   ├── webhooks.py          # Telegram + WhatsApp webhook endpoints
-│   │   │   ├── appointments.py      # Appointment CRUD endpoints
-│   │   │   ├── businesses.py        # Business management endpoints
-│   │   │   └── onboarding.py        # Google Calendar OAuth endpoints
-│   │   └── dependencies.py          # DB session, auth dependencies
-│   ├── services/
-│   │   ├── ai_service.py            # OpenAI integration + intent detection
-│   │   ├── booking_service.py       # Booking business logic
-│   │   ├── calendar_service.py      # Google Calendar integration
-│   │   ├── reminder_service.py      # APScheduler reminder scheduling
-│   │   └── faq_service.py           # FAQ retrieval and matching
-│   ├── models/
-│   │   ├── db/
-│   │   │   ├── business.py          # Business (restaurant/hostel) model
-│   │   │   ├── customer.py          # Customer model
-│   │   │   ├── booking.py           # Booking model
-│   │   │   ├── service.py           # Service/room type model
-│   │   │   ├── staff.py             # Staff/doctor model
-│   │   │   ├── faq.py               # FAQ model
-│   │   │   ├── support_session.py   # Support session model
-│   │   │   └── conversation.py      # Conversation history model
-│   │   └── schemas/
-│   │       ├── booking.py
-│   │       ├── business.py
-│   │       └── customer.py
-│   ├── core/
-│   │   ├── config.py                # All settings via pydantic-settings
-│   │   ├── database.py              # Neon async DB connection + session
-│   │   └── scheduler.py             # APScheduler instance
-│   └── utils/
-│       ├── datetime_utils.py        # Slot generation, date parsing
-│       └── message_templates.py     # All message strings in one place
-├── migrations/                      # Alembic migration files
-├── tests/
-│   ├── test_booking.py
-│   ├── test_ai_service.py
-│   └── test_channels.py
-├── CLAUDE.md
-├── ARCHITECTURE.md
-├── TODO.md
-├── .env.example
-├── requirements.txt
-├── Procfile
-└── README.md
+├── backend/                         # Python FastAPI app (run all backend commands from here)
+│   ├── app/
+│   │   ├── main.py                  # FastAPI app entry point + webhook registration
+│   │   ├── channels/
+│   │   │   ├── base.py              # Abstract channel interface
+│   │   │   ├── telegram.py          # Telegram implementation
+│   │   │   └── whatsapp.py          # WhatsApp implementation (Meta Cloud API)
+│   │   ├── bot/
+│   │   │   ├── handlers/
+│   │   │   │   ├── message_handler.py   # All incoming messages enter here
+│   │   │   │   ├── booking.py           # Booking flow & slot display
+│   │   │   │   ├── appointments.py      # View/reschedule/cancel
+│   │   │   │   ├── faq.py               # FAQ handler
+│   │   │   │   └── support.py           # Human handoff
+│   │   │   ├── keyboards.py             # Buttons and inline keyboards
+│   │   │   ├── states.py                # Conversation state constants
+│   │   │   └── bot.py                   # Bot initialization
+│   │   ├── api/
+│   │   │   ├── routes/
+│   │   │   │   ├── webhooks.py          # Telegram + WhatsApp webhook endpoints
+│   │   │   │   ├── appointments.py      # Appointment CRUD endpoints
+│   │   │   │   ├── businesses.py        # Business management endpoints
+│   │   │   │   └── onboarding.py        # Google Calendar OAuth endpoints
+│   │   │   └── dependencies.py          # DB session, auth dependencies
+│   │   ├── services/
+│   │   │   ├── ai_service.py            # OpenAI integration + intent detection
+│   │   │   ├── booking_service.py       # Booking business logic
+│   │   │   ├── calendar_service.py      # Google Calendar integration
+│   │   │   ├── reminder_service.py      # APScheduler reminder scheduling
+│   │   │   └── faq_service.py           # FAQ retrieval and matching
+│   │   ├── models/
+│   │   │   ├── db/
+│   │   │   │   ├── business.py          # Business (restaurant/hostel) model
+│   │   │   │   ├── customer.py          # Customer model
+│   │   │   │   ├── booking.py           # Booking model
+│   │   │   │   ├── service.py           # Service/room type model
+│   │   │   │   ├── staff.py             # Staff/doctor model
+│   │   │   │   ├── faq.py               # FAQ model
+│   │   │   │   ├── support_session.py   # Support session model
+│   │   │   │   └── conversation.py      # Conversation history model
+│   │   │   └── schemas/
+│   │   │       ├── booking.py
+│   │   │       ├── business.py
+│   │   │       └── customer.py
+│   │   ├── core/
+│   │   │   ├── config.py                # All settings via pydantic-settings
+│   │   │   ├── database.py              # Neon async DB connection + session
+│   │   │   └── scheduler.py             # APScheduler instance
+│   │   └── utils/
+│   │       ├── datetime_utils.py        # Slot generation, date parsing
+│   │       └── message_templates.py     # All message strings in one place
+│   ├── migrations/                      # Alembic migration files
+│   ├── .env.example
+│   ├── requirements.txt
+│   ├── Procfile
+│   └── runtime.txt
+├── dashboard/                       # Next.js client dashboard — see Client Dashboard section
+├── docs/                            # TELEGRAM_SETUP.md etc.
+├── claude.md
+├── README.md
+├── MIGRATIONS.md
+└── render.yaml                      # Render deploy (rootDir: backend)
 ```
 
 ---
@@ -559,7 +560,7 @@ DELETE /api/faqs/{id}                            Delete FAQ
 
 ---
 
-## Environment Variables (.env.example)
+## Environment Variables (backend/.env.example)
 ```
 # App
 SECRET_KEY=
@@ -674,3 +675,55 @@ GOOGLE_REDIRECT_URI=
 - booking_reference prefix: HST-
 - Extra fields: number of nights, check-in date, check-out date
 - Typical slot duration: 1440 minutes (full day)
+
+---
+
+## Client Dashboard
+
+A web dashboard for business owners (clients) to configure their system and monitor activity. All configuration and input that would otherwise require API calls or DB updates should be doable from the dashboard.
+
+### Purpose
+- **Setup**: Single place to create a business, get and copy their business ID, and configure everything the bot and backend need.
+- **Operations**: Track what is going on — available rooms/slots, incoming orders and bookings, support requests, conversation volume.
+- **Data management**: Update business details, services (tables/rooms/products), FAQs, staff, working hours, channel (Telegram/WhatsApp) without touching the API directly.
+
+### What the dashboard must support
+
+**Business setup and identity**
+- Create a new business (name, type: restaurant/hostel, timezone, location, phone).
+- Display and copy business ID (for webhooks, API, docs).
+- Edit business profile: working hours, slot duration, location, phone, active channel.
+
+**Products, rooms, services**
+- List, add, edit, deactivate services (e.g. "Table for 2", "Deluxe Room", "General Checkup").
+- Set name, description, duration, price, capacity where applicable.
+- For hostels: effectively "rooms" or room types; for restaurants: table types or products.
+
+**Content and staff**
+- FAQs: list, add, edit, delete; bulk import (file/CSV) as in existing API.
+- Staff: list, add, edit; link Telegram ID for /reply and /resolve.
+
+**Channels**
+- Telegram: show webhook URL and token usage; link to setup docs (e.g. TELEGRAM_SETUP.md).
+- WhatsApp: configure and store per-business WhatsApp config (phone_number_id, access_token, verify_token); switch active channel.
+
+**Tracking and monitoring**
+- Bookings: list (today, upcoming, past); status filters; quick view of reference, customer, service, date/time, party size, status.
+- Available capacity: by date and service (e.g. rooms left, slots left) so clients see availability at a glance.
+- Orders / reservations that came in: same as bookings, framed as "orders" or "reservations" where relevant.
+- Support: active support sessions, recent handoffs, or link to where staff reply (e.g. Telegram group).
+- Optional: simple conversation or message volume metrics (e.g. last 7 days).
+
+**Calendar**
+- Optional: start Google Calendar OAuth from dashboard; show connection status.
+
+### UI and UX
+- **User-friendly**: Clear labels, logical grouping, minimal steps for common tasks (e.g. "Add room", "Add FAQ").
+- **Easy to navigate**: Persistent nav (e.g. Business, Services, Bookings, FAQs, Staff, Settings/Channels); breadcrumbs where helpful; no deep mystery menus.
+- **Modern**: Clean layout, readable typography, consistent spacing, subtle use of color and hierarchy; responsive so it works on tablets.
+- **Professional**: No emojis in the UI. Copy and tone should feel human and product-like, not obviously AI-generated.
+
+### Technical notes
+- Dashboard is a separate frontend (e.g. React, Vue, or similar SPA) that consumes the existing FastAPI endpoints; or server-rendered pages (e.g. Jinja2) that call the same APIs.
+- Auth: dashboard must be protected (login/session or API keys per business); exact auth method (e.g. email/password, magic link, API key) to be defined.
+- All create/update/delete operations that the dashboard needs should go through the API (or shared service layer); no direct DB access from the dashboard app.

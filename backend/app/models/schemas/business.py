@@ -40,3 +40,13 @@ class BusinessResponse(BaseModel):
     telegram_group_id: str | None
     active_channel: str
     is_active: bool
+
+
+class BusinessDetailResponse(BusinessResponse):
+    """Business with full details for dashboard edit."""
+
+    working_hours: dict[str, list[str]]
+    slot_duration_minutes: int
+    timezone: str
+    location: str | None
+    phone: str | None

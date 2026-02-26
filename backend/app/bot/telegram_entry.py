@@ -275,8 +275,10 @@ async def handle_telegram_update(
                 except (ValueError, TypeError):
                     party_size = None
             service_id = _uuid_from_data(data, "service_id")
-            booking_date = data.get("date") or ""
-            if service_id.int:
+            if (not service_id or service_id.int == 0) and business.services:
+                service_id = business.services[0].id
+            booking_date = data.get("date") or data.get("booking_date") or ""
+            if service_id and service_id.int:
                 customer.conversation_state = {
                     **(customer.conversation_state or {}),
                     "pending_booking": {

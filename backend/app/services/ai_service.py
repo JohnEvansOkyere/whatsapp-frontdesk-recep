@@ -156,12 +156,18 @@ _ACTION_LINE_RE = re.compile(
     r"^\s*ACTION:\s*(\w+)(?:\s+\{([^}]*)\}|\s+(.+))?\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
+# Inline: "... text. ACTION: SHOW_SLOTS" or "ACTION: SHOW_SLOTS { ... }" at end of a line
+_ACTION_INLINE_RE = re.compile(
+    r"[\s.]*\s*ACTION:\s*(\w+)(?:\s*\{([^}]*)\})?\s*$",
+    re.IGNORECASE,
+)
 
 
 def _parse_action_and_data(raw_text: str) -> tuple[Optional[AIAction], Dict[str, Any] | None, str]:
     """Parse ACTION tags from the model reply per CLAUDE.md.
 
     Returns (action, data, reply_text_with_action_lines_stripped).
+    Handles both whole-line ACTION and inline (e.g. "... yourself. ACTION: SHOW_SLOTS").
     """
     action: Optional[AIAction] = None
     data: Dict[str, Any] | None = None
@@ -169,7 +175,8 @@ def _parse_action_and_data(raw_text: str) -> tuple[Optional[AIAction], Dict[str,
     kept_lines: list[str] = []
 
     for line in lines:
-        m = _ACTION_LINE_RE.match(line.strip())
+        stripped = line.strip()
+        m = _ACTION_LINE_RE.match(stripped)
         if m:
             name, brace_content, rest = m.group(1), m.group(2), m.group(3)
             try:
@@ -177,19 +184,53 @@ def _parse_action_and_data(raw_text: str) -> tuple[Optional[AIAction], Dict[str,
             except ValueError:
                 kept_lines.append(line)
                 continue
-            # Optional payload: {service_id, date, party_size} or key=val key2=val2
             if brace_content:
-                parts = [p.strip() for p in brace_content.split(",")]
-                data = {p: None for p in parts if p}
+                data = {}
+                for part in brace_content.split(","):
+                    part = part.strip()
+                    if "=" in part:
+                        k, _, v = part.partition("=")
+                        data[k.strip()] = v.strip()
+                    elif part:
+                        data[part] = None
+                if not data:
+                    data = None
             elif rest:
                 data = {}
                 for part in rest.split():
                     if "=" in part:
                         k, _, v = part.partition("=")
                         data[k.strip()] = v.strip()
-            if not data:
+                if not data:
+                    data = None
+            else:
                 data = None
-            # Don't add ACTION line to reply shown to user
+            continue
+        # Inline: "sentence. ACTION: SHOW_SLOTS" on same line
+        inline = _ACTION_INLINE_RE.search(stripped)
+        if inline:
+            name, brace_content = inline.group(1), inline.group(2)
+            line_before = stripped[: inline.start()].strip()
+            if line_before:
+                kept_lines.append(line_before)
+            try:
+                action = AIAction(name.upper())
+            except ValueError:
+                kept_lines.append(line)
+                continue
+            if brace_content:
+                data = {}
+                for part in brace_content.split(","):
+                    part = part.strip()
+                    if "=" in part:
+                        k, _, v = part.partition("=")
+                        data[k.strip()] = v.strip()
+                    elif part:
+                        data[part] = None
+                if not data:
+                    data = None
+            else:
+                data = None
             continue
         kept_lines.append(line)
 

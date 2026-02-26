@@ -1,12 +1,12 @@
 # Database migrations guide
 
-This project uses [Alembic](https://alembic.sqlalchemy.org/) for database migrations. The database is **PostgreSQL only** (Neon). You must set `NEON_DATABASE_URL` in `.env` before running migrations or the app.
+This project uses [Alembic](https://alembic.sqlalchemy.org/) for database migrations. The database is **PostgreSQL only** (Neon). You must set `NEON_DATABASE_URL` in `backend/.env` before running migrations or the app.
 
 ---
 
 ## Prerequisites
 
-- Python environment with project dependencies installed (`uv sync` or `pip install -r requirements.txt`).
+- Python environment with backend dependencies installed: from the **backend** directory run `uv sync` or `pip install -r requirements.txt`.
 - A [Neon](https://neon.tech) account and a PostgreSQL database.
 
 ---
@@ -25,7 +25,7 @@ This project uses [Alembic](https://alembic.sqlalchemy.org/) for database migrat
 
 ## 2. Configure the database URL
 
-Create a `.env` in the project root (or copy from `.env.example`) and set:
+Create a `.env` in the **backend** directory (copy from `backend/.env.example`) and set:
 
 ```env
 NEON_DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
@@ -39,66 +39,68 @@ Migrations and the app both require `NEON_DATABASE_URL` to be set; there is no S
 
 ## 3. Apply migrations (create/update schema)
 
-From the project root:
+From the **backend** directory:
 
 ```bash
+cd backend
 alembic upgrade head
 ```
 
 This applies all pending migrations and brings the database schema up to date. For a new Neon database, this creates all tables (businesses, customers, services, staff, bookings, faqs, conversation_history, support_sessions).
 
-**Check current revision:**
+**Check current revision:** (from backend directory)
 
 ```bash
-alembic current
+cd backend && alembic current
 ```
 
 **See migration history:**
 
 ```bash
-alembic history
+cd backend && alembic history
 ```
 
 ---
 
 ## 4. Create a new migration (after model changes)
 
-After changing SQLAlchemy models under `app/models/db/`:
+After changing SQLAlchemy models under `backend/app/models/db/`:
 
-1. Ensure the app can load (so Alembic can see `Base.metadata`).
+1. Ensure the app can load (so Alembic can see `Base.metadata`). Run from the **backend** directory.
 2. Generate a new revision:
 
    ```bash
+   cd backend
    alembic revision --autogenerate -m "Short description of the change"
    ```
 
-3. Open the new file under `migrations/versions/` and fix any PostgreSQL-specific types if you generated against SQLite (e.g. use `sa.Text()` / `sa.String()` in JSON/ARRAY, and `sa.text('now()')` for timestamp defaults).
+3. Open the new file under `backend/migrations/versions/` and fix any PostgreSQL-specific types if you generated against SQLite (e.g. use `sa.Text()` / `sa.String()` in JSON/ARRAY, and `sa.text('now()')` for timestamp defaults).
 4. Apply it:
 
    ```bash
-   alembic upgrade head
+   cd backend && alembic upgrade head
    ```
 
 ---
 
 ## 5. Downgrade (roll back)
 
-Roll back one revision:
+Roll back one revision (from backend directory):
 
 ```bash
-alembic downgrade -1
+cd backend && alembic downgrade -1
 ```
 
 Roll back to a specific revision:
 
 ```bash
-alembic downgrade <revision_id>
+cd backend && alembic downgrade <revision_id>
 ```
 
 Roll back all migrations:
 
 ```bash
-alembic downgrade base
+cd backend && alembic downgrade base
 ```
 
 ---
@@ -107,11 +109,11 @@ alembic downgrade base
 
 | Command | Description |
 |--------|-------------|
-| `alembic upgrade head` | Apply all migrations (bring DB to latest). |
-| `alembic downgrade -1` | Undo the last migration. |
-| `alembic current` | Show current revision. |
-| `alembic history` | List all revisions. |
-| `alembic revision --autogenerate -m "msg"` | Create a new migration from model changes. |
+| `cd backend && alembic upgrade head` | Apply all migrations (bring DB to latest). |
+| `cd backend && alembic downgrade -1` | Undo the last migration. |
+| `cd backend && alembic current` | Show current revision. |
+| `cd backend && alembic history` | List all revisions. |
+| `cd backend && alembic revision --autogenerate -m "msg"` | Create a new migration from model changes. |
 
 ---
 
